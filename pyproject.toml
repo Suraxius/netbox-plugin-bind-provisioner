@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=61", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "netbox-plugin-bind-provisioner"
+dynamic = ["version"]
+description = "A Bind provisioning plugin that uses netbox_dns for its data source"
+authors = [
+    { name = "Sven Luethi" },
+]
+license = { text = "GPL-2.0" }
+readme = "README.md"
+requires-python = ">=3.7"
+dependencies = ["netbox-plugin-dns"]
+
+[tool.setuptools]
+include-package-data = true
+zip-safe = false
+package-dir = { "" = "src" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.dynamic]
+version = { attr = "netbox_plugin_bind_provisioner.__version__" }
+

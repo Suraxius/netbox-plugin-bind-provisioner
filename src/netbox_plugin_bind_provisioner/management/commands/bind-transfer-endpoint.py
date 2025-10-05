@@ -598,7 +598,7 @@ class Command(BaseCommand):
     help = "Run a minimal AXFR DNS server using NetBox DNS plugin data"
 
     def loadSettings(self):
-        self.settings = settings.PLUGINS_CONFIG.get("netbox_bind_provisioner", None)
+        self.settings = settings.PLUGINS_CONFIG.get("netbox_plugin_bind_provisioner", None)
         if not self.settings:
             raise RuntimeError(
                 "Command failed to initialize due to missing settings. Terminating Netbox."

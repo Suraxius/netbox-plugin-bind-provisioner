@@ -25,3 +25,6 @@ where = ["src"]
 [tool.setuptools.dynamic]
 version = { attr = "netbox_plugin_bind_provisioner.__version__" }
 
+[project.urls]
+Homepage = "https://github.com/Suraxius/netbox-plugin-bind-provisioner"
+Issues = "https://github.com/Suraxius/netbox-plugin-bind-provisioner/issues"

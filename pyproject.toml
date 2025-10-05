@@ -23,7 +23,7 @@ package-dir = { "" = "src" }
 where = ["src"]
 
 [tool.setuptools.dynamic]
-version = { attr = "netbox_plugin_bind_provisioner.__version__" }
+version = { attr = "netbox_bind_provisioner.__version__" }
 
 [project.urls]
 Homepage = "https://github.com/Suraxius/netbox-plugin-bind-provisioner"

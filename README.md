@@ -14,19 +14,35 @@ bind-transfer-endpoint needs to be running as its own service in the background
 via the `manage.py` command. Note that dnssec support will be implemented as
 soon as bind9 has a mechanism to allow configuration of such via the Catalog
 Zones mechanism.
+
 ```
-venv/bin/python3 netbox/netbox/manage.py bind-transfer-endpoint --port 5354
+manage.py bind-transfer-endpoint --port 5354
 ```
 
-### Parameters
+The plugin also currently needs a file that tracks the current state of the
+catalog zone's SOA serial. The serial represents the catalog zone's SOA record
+serial number and is used by downstream DNS Servers to determine if the catalog
+zone was updated (e.g. if a zone is added/modified/removed from netbox).
+The file is used to persist the SOA record's serial across service restarts.
+It will be replaced by a database entry once the plugin has its own models.
+
+### Service parameters
 Parameter | Description
---------- | --------------------------------------------------------
+--------- | -------------------------------------------------------------------
 --port    | Port to listen on for requests (defaults to 5354)
 --address | IP of interface to bind to (defaults to 0.0.0.0)
 
+### Plugin settings
+Setting             | Description
+--------------------| ---------------------------------------------------------
+catalog_serial_file | The catalog serial counter. The file needs to be writable.
+tsig_keys           | Maps a TSIG Key to be used for each view.
+
+### Plugin example configuration
 ```
 PLUGINS_CONFIG = {
     "netbox_bind_provisioner": {
+        "catalog_serial_file": "/opt/netbox/catalog-serial.txt",
         "tsig_keys": {
             "key1name": {
                 "view":      "public",
@@ -45,7 +61,7 @@ PLUGINS_CONFIG = {
 }
 ```
 
-## Bind configuration
+## Bind example configuration
 ```
 options {
     ...
@@ -54,6 +70,7 @@ options {
     allow-query       { any; };
     allow-recursion   { none; };
     notify            yes;
+    min-refresh-time 60;
     ...
     ...
 };

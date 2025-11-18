@@ -112,7 +112,7 @@ This guide assumes:
     Note that the tsig-key attributes keyname, algorithm and secret form a
     dictionary in following python structure path:
     ```
-    PLUGINS_CONFIG.netbox_bind_provisioner.tsig_keys.<dns_view_name>
+    PLUGINS_CONFIG.netbox_plugin_bind_provisioner.tsig_keys.<dns_view_name>
     ```
     This allows the plugin to map requests to the right dns view using the tsig
     signature from each request.

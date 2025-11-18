@@ -92,7 +92,7 @@ This guide assumes:
     to
     ```
     PLUGINS_CONFIG = {
-        "netbox_bind_provisioner": {
+        "netbox_plugin_bind_provisioner": {
             "catalog_serial_file": "/opt/netbox/catalog-serial.txt",
             "tsig_keys": {
                 "public": {

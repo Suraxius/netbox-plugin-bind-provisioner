@@ -123,13 +123,11 @@ This guide assumes:
     ```
 
 5. Start listener
-    This step runs the DNS endpoint used by bind to configure itself. You may want
-    to write a service wrapper that runs this in the background. Dont forget to
-    activate the venv if you do decide to run this service in the background.
-    Note that `--port 5354` is optional. The listener will bind this port
-    by default.
+    Copy the systemd service file into /etc/systemd/system and start the service.  Check status.
     ```
-    python3 netbox/manage.py bind-transfer-endpoint --port 5354
+    mv netbox-bind-endpoint.service /etc/systemd/systemd ; systemctl daemon-reload
+    systemctl enable netbox-bind-endpoint ; systemctl start netbox-bind-endpoint
+    systemctl status netbox-bind-endpoint
     ```
 
 6. Configuring a Bind9 to interact with Netbox via the bind-transfer-endpoint

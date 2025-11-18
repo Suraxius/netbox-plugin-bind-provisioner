@@ -125,7 +125,7 @@ This guide assumes:
 5. Start listener
     Copy the systemd service file into /etc/systemd/system and start the service.  Check status.
     ```
-    mv netbox-bind-endpoint.service /etc/systemd/systemd ; systemctl daemon-reload
+    mv netbox-bind-endpoint.service /etc/systemd/system ; systemctl daemon-reload
     systemctl enable netbox-bind-endpoint ; systemctl start netbox-bind-endpoint
     systemctl status netbox-bind-endpoint
     ```

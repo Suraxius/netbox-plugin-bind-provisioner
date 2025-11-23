@@ -20,70 +20,44 @@ from django.utils import timezone
 from netbox_dns.models import Zone, Record, View
 from netbox_dns.choices import ZoneStatusChoices, RecordStatusChoices
 from datetime import datetime
+from netbox_plugin_bind_provisioner.models import IntegerKeyValueSetting
 
 logger = logging.getLogger('bind-transfer-endpoint')
 
-class CatalogZoneAssembler():
+class CatalogZone():
     lock = threading.Lock()
     _serial_max = 0xFFFFFFFF
-    _serial = 1
-    _serial_file = None
+    _serial_obj = None
     _previous_last_zone_update = None
 
-    # Following function loads the last serial from file. No return value
+    # Following function loads the last serial from the DB. No return value
     # but it sets the setting "catalog_serial" or terminates the plugin on failure.
     @classmethod
-    def initCatalogZoneSerial(cls, serial_file):
-        """
-        Load a 32-bit unsigned int serial from a text file.
-        If the file doesn't exist, initialize it with 1.
-        Returns the serial as an int.
-        """
-        cls._serial_file = serial_file
+    def initSerial(cls):
+        try:
+            cls._serial_obj = IntegerKeyValueSetting.objects.get(key="catalog-zone-soa-serial")
+            logger.debug(f"Catalog zone SOA serial number {cls._serial_obj.value} loaded from database")
+        except IntegerKeyValueSetting.DoesNotExist:
+            cls._serial_obj = IntegerKeyValueSetting.objects.create(key="catalog-zone-soa-serial", value=1)
+            logger.debug(f"Catalog zone SOA serial number was not set in the database. Set to {cls._serial_obj.value}")
 
-        if not os.path.exists(cls._serial_file):
-            try:
-                with open(cls._serial_file, "w") as f:
-                    f.write(f"{cls._serial}\n")
-                return
-            except OSError as e:
-                raise RuntimeError(
-                    f"Failed to initialize serial file {cls._serial_file}: {e}"
-                )
-        else:
-            try:
-                with open(cls._serial_file, "r") as f:
-                    value = int(f.read().strip())
-
-                if 0 < value <= cls._serial_max:
-                    cls._serial = value
-                else:
-                    raise ValueError(f"Serial value out of 32-bit range: {value}")
-            except (OSError, ValueError) as e:
-                raise RuntimeError(f"Failed to read serial from {cls._serial_file}: {e}")
 
     @classmethod
-    def incrementCatalogZoneSerial(cls):
-        """
-        Increments the in-memory catalog serial and saves it to file.
-        Updates _serial.
-        """
-        if 0 < cls._serial < cls._serial_max:
-            cls._serial += 1
+    def _incrementSerial(cls):
+        if 0 < cls._serial_obj.value < cls._serial_max:
+            cls._serial_obj.value += 1
+            cls._serial_obj.save()
         else:
             logger.warn(
-                f"Failed to incremenet catalog serial {cls._serial}. Will overflow serial back to 1."
+                f"Failed to incremenet catalog serial {cls._serial_obj.value}. Will overflow serial back to 1"
             )
-            cls._serial = 1
+            cls._serial_obj = 1
+            cls._serial_obj.save()
+            logger.debug(f"Catalog zone SOA serial number incremented to {_serial_obj.value}")
 
-        try:
-            with open(cls._serial_file, "w") as f:
-                f.write(f"{cls._serial}\n")
-        except OSError as e:
-            logger.error(f"Failed to write updated serial to {cls._serial_file}: {e}")
 
     @classmethod
-    def createCatalogZone(cls, view_name, soa_only=False):
+    def create(cls, view_name, soa_only=False):
         # Synchronize following across threads as TCP and UDP listener both use it.
         with cls.lock:
             #cls = self.__class__
@@ -102,7 +76,7 @@ class CatalogZoneAssembler():
                     )
                 # Setting previous last zone update for next iteration:
                 cls._previous_last_zone_update = last_zone_update
-                cls.incrementCatalogZoneSerial()
+                cls._incrementSerial()
             # If there was no update, do nothing.
             #else:
             #    logger.debug(f"No need to update serial for catalog zone")
@@ -159,7 +133,7 @@ class CatalogZoneAssembler():
         rtype = dns.rdatatype.SOA
         mname = dns.name.root  # dns.name.from_text("invalid.", origin)
         rname = dns.name.root  # dns.name.from_text("contact.master.", origin)
-        serial = cls._serial
+        serial = cls._serial_obj.value
         refresh = 60
         retry = 10
         expire = 1209600
@@ -207,6 +181,19 @@ class CatalogZoneAssembler():
         txt_node.rdatasets.append(txt_rdataset)
 
         return zone
+
+    @classmethod
+    def importLegacySerialFile(cls, file_path):
+        if os.path.exists(file_path):
+            try:
+                with open(file_path, "r") as f:
+                    serial = int(f.read().strip())
+                    cls._serial_obj.value = int(serial)
+                    cls._serial_obj.save()
+                    logger.info(f"Legacy catalog serial file {file_path} imported into database and file removed. Serial is now {serial}")
+                    os.remove(file_path)
+            except OSError as e:
+                logger.error(f"Failed to import catalog zone serial from legacy file {file_path}")
 
 
 class DNSBaseRequestHandler(socketserver.BaseRequestHandler):
@@ -356,7 +343,7 @@ class UDPRequestHandler(DNSBaseRequestHandler):
 
         # Check if catalog zone
         if dname == "catz":
-            zone = CatalogZoneAssembler.createCatalogZone(nb_view.name, soa_only=True)
+            zone = CatalogZone.create(nb_view.name, soa_only=True)
         # If generic zone, retreive from NB
         else:
             zone = self.getZoneFromNB(dname, nb_view, soa_only=True)
@@ -471,8 +458,7 @@ class TCPRequestHandler(DNSBaseRequestHandler):
 
             # Check if catalog zone
             if dname == "catz":
-                #zone = self.createCatalogZone(str(nb_view))
-                zone = CatalogZoneAssembler.createCatalogZone(nb_view.name)
+                zone = CatalogZone.create(nb_view.name)
             else:
                 zone = self.getZoneFromNB(dname, nb_view)
 
@@ -610,17 +596,8 @@ class Command(BaseCommand):
                 "tsig_keys variable not set in plugin settings."
             )
 
-    def loadCatalogZoneSettings(self):
-        serial_file = self.settings.get("catalog_serial_file", None)
-        if not serial_file:
-            raise RuntimeError(
-                "catalog_serial_file variable not set in plugin settings."
-            )
-        else:
-            CatalogZoneAssembler.initCatalogZoneSerial(serial_file)
-
+    # Load TSIG keys and map them to views
     def loadTSIGKeySettings(self):
-        # Load TSIG keys and map them to views
         self.keyring = {}
         self.tsig_view_map = {}
 
@@ -668,10 +645,15 @@ class Command(BaseCommand):
         # Load parameters
         port = options['port']
         address = options['address']
+        CatalogZone.initSerial()
         # Initialize settings
         self.loadSettings()
-        self.loadCatalogZoneSettings()
+        #self.loadCatalogZoneSettings()
         self.loadTSIGKeySettings()
+        # Following is temporary. Function and invocation can be deleted once v1.0 is reached.
+        serial_file = self.settings.get("catalog_serial_file", None)
+        if serial_file:
+            CatalogZone.importLegacySerialFile(serial_file)
 
         udp_server = UDPDNSServer((address, port), UDPRequestHandler, self.keyring, self.tsig_view_map)
         tcp_server = TCPDNSServer((address, port), TCPRequestHandler, self.keyring, self.tsig_view_map)

@@ -24,13 +24,6 @@ To start the service:
 manage.py bind-transfer-endpoint --port 5354
 ```
 
-The plugin currently requires a file to track the SOA serial of the catalog zone.
-This serial represents the SOA record’s version number and allows downstream
-DNS servers to determine when the catalog zone has changed (for example,
-when a zone is added, modified, or removed in NetBox). The file ensures the
-serial persists across service restarts. It will be replaced with a
-database-backed value once the plugin introduces its own models.
-
 When configuring the plugin, you need to provide a path on the filesystem for
 this file where the plugin can create and manage it. Please do not update it by
 hand or remove it unless you know what you are doing.
@@ -44,7 +37,7 @@ Parameter | Description
 ### Plugin settings
 Setting             | Description
 --------------------| ---------------------------------------------------------
-catalog_serial_file | The catalog serial counter. The file needs to be writable.
+catalog_serial_file | !!!NO LONGER USED!!! Replaced by DB entry.
 tsig_keys           | Maps a TSIG Key to be used for each view.
 
 ## Installation guide
@@ -93,7 +86,6 @@ This guide assumes:
     ```
     PLUGINS_CONFIG = {
         "netbox_plugin_bind_provisioner": {
-            "catalog_serial_file": "/opt/netbox/catalog-serial.txt",
             "tsig_keys": {
                 "public": {
                     "keyname":   "public_view_key",

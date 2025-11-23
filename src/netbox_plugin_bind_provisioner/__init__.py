@@ -5,7 +5,7 @@ from django.utils.translation import gettext_lazy as _
 from django.dispatch import receiver
 from django.conf import settings
 
-__version__ = "0.9.5"
+__version__ = "0.9.6"
 
 logger = logging.getLogger(__name__)
 
@@ -31,25 +31,6 @@ class BindProvisionerConfig(PluginConfig):
             raise RuntimeError(
                 f"{self.name}: Plugin {self.verbose_name} failed to initialize due to missing settings. Terminating Netbox."
             )
-
-    #    from . import bind, rndc
-    #
-    #    if not bind.zoneDirWritable():
-    #        BIND_ZONE_DIR = settings.get("BIND_ZONE_DIR")
-    #        logger.error(f"Bind's zone file directory {BIND_ZONE_DIR} is not writable.")
-    #        raise RuntimeError(
-    #            "Plugin initialization failed due to failed writable-zone-directory healthcheck."
-    #        )
-    #    if not rndc.tsigKeyFileAccessible():
-    #        RNDC_KEY_FILE = settings.get("RNDC_KEY_FILE")
-    #        logger.error(f"The RNDC key file {RNDC_KEY_FILE} is inaccessible.")
-    #        raise RuntimeError(
-    #            "Plugin initialization failed due to failed rndc-key-accessible healthcheck."
-    #        )
-    #
-    #    # Import signal callbacks from signals.py (With @receiver decorations)
-    #    from . import signals
-
 
 config = BindProvisionerConfig
 default_app_config = ".apps.NetboxBindProvisionerConfig"

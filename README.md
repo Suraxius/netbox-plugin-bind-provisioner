@@ -109,7 +109,7 @@ This guide assumes:
     This allows the plugin to map requests to the right dns view using the tsig
     signature from each request.
 
-4. Run migrations (This step is not yet required. Just adding for completeness)
+4. Run migrations
     ```
     python3 netbox/manage.py migrate
     ```

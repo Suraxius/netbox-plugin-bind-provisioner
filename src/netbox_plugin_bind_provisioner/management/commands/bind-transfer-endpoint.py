@@ -197,7 +197,7 @@ class CatalogZone():
 
 
 class DNSBaseRequestHandler(socketserver.BaseRequestHandler):
-     # getZoneFromNB rewritten
+    # getZoneFromNB rewritten
     def getZoneFromNB(self, zone_name, view_name, soa_only=False):
         # Find the zone
         try:
@@ -260,17 +260,15 @@ class DNSBaseRequestHandler(socketserver.BaseRequestHandler):
 
                 # Replace the rdataset for the given name and type
                 zone.replace_rdataset(name, rdataset)
-
         return zone
 
 
-
-    def denyRequest(self, query, rcode: dns.rcode = dns.rcode.REFUSED):
-        response = dns.message.make_response(query)
-        response.set_rcode(rcode)
-        wire = response.to_wire(multi=False)
-        length = len(wire).to_bytes(2, byteorder="big")
-        self.request.sendall(length + wire)
+#    def denyRequest(self, query, rcode: dns.rcode = dns.rcode.REFUSED):
+#        response = dns.message.make_response(query)
+#        response.set_rcode(rcode)
+#        wire = response.to_wire(multi=False)
+#        length = len(wire).to_bytes(2, byteorder="big")
+#        self.request.sendall(length + wire)
 
 
     def denyRequestBadTSIG(self, wire, tsig_error: dns.rcode):
@@ -292,6 +290,13 @@ class DNSBaseRequestHandler(socketserver.BaseRequestHandler):
 
 
 class UDPRequestHandler(DNSBaseRequestHandler):
+    def denyRequest(self, query, rcode: dns.rcode = dns.rcode.REFUSED):
+        response = dns.message.make_response(query)
+        response.set_rcode(rcode)
+        wire = response.to_wire(multi=False)
+        sock = self.request[1]
+        sock.sendto(wire, self.client_address)
+
     def handle(self):
         data, sock = self.request
         peer = self.client_address[0]
@@ -301,11 +306,11 @@ class UDPRequestHandler(DNSBaseRequestHandler):
             query = dns.message.from_wire(
                 data,
                 keyring=self.server.keyring,
-                continue_on_error=True,
+                continue_on_error=False,
                 ignore_trailing=True
             )
         except Exception as e:
-            logger.error("Error parsing query:", e)
+            logger.error("Error parsing query: ", e)
             return
 
         # Create a response
@@ -328,11 +333,12 @@ class UDPRequestHandler(DNSBaseRequestHandler):
             return
 
         # Identify TSIG key used
-        key_name = query.keyname.canonicalize().to_text() if query.keyname else None
-        if not key_name:
+        if not query.had_tsig:
             logger.warning(f"Request denied from {peer}: No TSIG key used")
             self.denyRequest(query)
             return
+
+        key_name = query.keyname.canonicalize().to_text()
 
         # Check if key matches a view
         nb_view = self.server.tsig_view_map.get(key_name)
@@ -387,6 +393,13 @@ class UDPRequestHandler(DNSBaseRequestHandler):
 
 
 class TCPRequestHandler(DNSBaseRequestHandler):
+    def denyRequest(self, query, rcode: dns.rcode = dns.rcode.REFUSED):
+        response = dns.message.make_response(query)
+        response.set_rcode(rcode)
+        wire = response.to_wire(multi=False)
+        length = len(wire).to_bytes(2, byteorder="big")
+        self.request.sendall(length + wire)
+
     def handle(self):
         MAX_WIRE = 65535
         # MAX_WIRE = 2000 # For testing fragmentation
@@ -443,11 +456,12 @@ class TCPRequestHandler(DNSBaseRequestHandler):
                 return
 
             # Identify TSIG key used
-            key_name = query.keyname.canonicalize().to_text() if query.keyname else None
-            if not key_name:
+            if not query.had_tsig:
                 logger.warning(f"Request denied from {peer}: No TSIG key used")
                 self.denyRequest(query)
                 return
+
+            key_name = query.keyname.canonicalize().to_text()
 
             # Check if the key matches a view
             nb_view = self.server.tsig_view_map.get(key_name)
@@ -630,7 +644,7 @@ class Command(BaseCommand):
                 name=key_name_obj, secret=secret, algorithm=algorithm_str
             )
             self.tsig_view_map[key_name_str] = nb_view
-            logger.debug(f"Loaded TSIG key: {key_name_str} (view: {nb_view.name})")
+            logger.debug(f"Loaded TSIG key: {key_name_str} view: {nb_view.name}")
 
         if not self.keyring:
             msg = "No TSIG keys found in database."

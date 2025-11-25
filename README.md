@@ -116,8 +116,11 @@ This guide assumes:
 
 5. Start listener
     This step runs the DNS endpoint used by bind to configure itself. You may want
-    to write a service wrapper that runs this in the background. Dont forget to
-    activate the venv if you do decide to run this service in the background.
+    to write a service wrapper that runs this in the background.
+    A guide for setting up a systemd service on Ubuntu is provided by Matt
+    Kollross [here](docs/install-systemd-service.md). Dont forget to activate
+    the venv if you do decide to run this service in the background.
+
     Note that `--port 5354` is optional. The listener will bind this port
     by default.
     ```

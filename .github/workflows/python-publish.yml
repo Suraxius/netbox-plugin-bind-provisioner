@@ -6,21 +6,21 @@
 # separate terms of service, privacy policy, and support
 # documentation.
 
-name: Upload Python Package
+name: Create and Upload Python Package
 
 on:
   release:
     types: [published]
-#  push:
-#    branches:
-#      - main
 
 permissions:
   contents: read
 
 jobs:
-  build-release:
-    name: Build
+  build-and-publish:
+    name: Build and Publish
+    environment: pypi
+    permissions:
+      id-token: write
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -29,23 +29,14 @@ jobs:
         with:
           python-version: "3.x"
 
-      - name: Build release distributions
+      - name: Install build tools
         run: |
-          # NOTE: put your own distribution build steps here.
+          python -m pip install --upgrade pip
           python -m pip install build
-          python -m build --wheel
 
-      - name: Upload distributions
-        uses: actions/upload-artifact@v4
-        with:
-          name: release-dists
-          path: dist/
+      - name: Build release
+        run: |
+          python -m build --sdist --wheel
 
-  pypi-publish:
-    name: Upload
-    environment: pypi
-    permissions:
-      id-token: write
-    steps:
       - name: Publish package distributions to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1

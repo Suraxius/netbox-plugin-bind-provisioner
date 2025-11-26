@@ -57,7 +57,7 @@ class CatalogZone():
 
 
     @classmethod
-    def create(cls, view_name, soa_only=False):
+    def create(cls, name, view_name):
         # Synchronize following across threads as TCP and UDP listener both use it.
         with cls.lock:
             #cls = self.__class__
@@ -77,12 +77,9 @@ class CatalogZone():
                 # Setting previous last zone update for next iteration:
                 cls._previous_last_zone_update = last_zone_update
                 cls._incrementSerial()
-            # If there was no update, do nothing.
-            #else:
-            #    logger.debug(f"No need to update serial for catalog zone")
 
         # Zone origin
-        origin = dns.name.from_text("catz", dns.name.root)
+        origin = dns.name.from_text(name, dns.name.root)
 
         # Create a new empty zone
         zone = dns.zone.Zone(origin)
@@ -198,11 +195,11 @@ class CatalogZone():
 
 class DNSBaseRequestHandler(socketserver.BaseRequestHandler):
     # getZoneFromNB rewritten
-    def getZoneFromNB(self, zone_name, view_name, soa_only=False):
+    def getZoneFromNB(self, zone_name, view_name):
         # Find the zone
         try:
             nb_zone = Zone.objects.get(
-                name=zone_name, view=view_name, status=ZoneStatusChoices.STATUS_ACTIVE
+                name=zone_name, view__name=view_name, status=ZoneStatusChoices.STATUS_ACTIVE
             )
         except Zone.DoesNotExist:
             return None
@@ -261,14 +258,6 @@ class DNSBaseRequestHandler(socketserver.BaseRequestHandler):
                 # Replace the rdataset for the given name and type
                 zone.replace_rdataset(name, rdataset)
         return zone
-
-
-#    def denyRequest(self, query, rcode: dns.rcode = dns.rcode.REFUSED):
-#        response = dns.message.make_response(query)
-#        response.set_rcode(rcode)
-#        wire = response.to_wire(multi=False)
-#        length = len(wire).to_bytes(2, byteorder="big")
-#        self.request.sendall(length + wire)
 
 
     def denyRequestBadTSIG(self, wire, tsig_error: dns.rcode):
@@ -348,11 +337,11 @@ class UDPRequestHandler(DNSBaseRequestHandler):
             return
 
         # Check if catalog zone
-        if dname == "catz":
-            zone = CatalogZone.create(nb_view.name, soa_only=True)
+        if dname == "catz" or dname == f"{nb_view.name}.catz":
+            zone = CatalogZone.create(dname, nb_view.name)
         # If generic zone, retreive from NB
         else:
-            zone = self.getZoneFromNB(dname, nb_view, soa_only=True)
+            zone = self.getZoneFromNB(dname, nb_view.name)
             # When zone was not found, let client know
             if not zone:
                 logger.warning(f"Zone {nb_view.name}/{dname} not found in NB")
@@ -363,10 +352,9 @@ class UDPRequestHandler(DNSBaseRequestHandler):
         soa_rdataset = zone.get_rdataset(zone.origin, dns.rdatatype.SOA)
 
         # We assume that the SOA rdataset has at least one record (it usually does).
-        soa_rdata = soa_rdataset[0]  # Get the first SOA record
+        soa_rdata = soa_rdataset[0] # Get the first SOA record
 
         # Now, create the rrset from the soa_rdata
-        #rrset = dns.rrset.from_rdata(dname, soa_rdataset.ttl, soa_rdata)
         rrset = dns.rrset.from_rdata(zone.origin, soa_rdataset.ttl, soa_rdata)
 
         # Append the rrset to the response's answer section
@@ -471,10 +459,10 @@ class TCPRequestHandler(DNSBaseRequestHandler):
                 return
 
             # Check if catalog zone
-            if dname == "catz":
-                zone = CatalogZone.create(nb_view.name)
+            if dname == "catz" or dname == f"{nb_view.name}.catz":
+                zone = CatalogZone.create(dname, nb_view.name)
             else:
-                zone = self.getZoneFromNB(dname, nb_view)
+                zone = self.getZoneFromNB(dname, nb_view.name)
 
             # When zone was not found, let client know
             if not zone:

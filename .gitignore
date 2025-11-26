@@ -1,3 +1,4 @@
 src/netbox_plugin_bind_provisioner.egg-info
 dist/
+build/
 __pycache__

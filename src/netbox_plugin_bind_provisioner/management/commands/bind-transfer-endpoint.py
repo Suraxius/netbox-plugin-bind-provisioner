@@ -110,19 +110,21 @@ class CatalogZone():
             # Configure DNSSec Policy for member Zone if DNSSec is enabled
             if nb_zone.dnssec_policy:
                 # Configure policy
-                rid = dns.name.from_text(f"policy.dnssec", ptr_name)
+                rid = dns.name.from_text("group", ptr_name)
+                policy_name = nb_zone.dnssec_policy.name.rstrip(" ")
+                group_name = f'dnssec-policy-{policy_name}'
                 rdata = dns.rdata.from_text(
-                    dns.rdataclass.IN, dns.rdatatype.TXT, nb_zone.dnssec_policy.name
+                    dns.rdataclass.IN, dns.rdatatype.TXT, group_name
                 )
                 rdataset = zone.find_rdataset(rid, dns.rdatatype.TXT, create=True)
                 rdataset.add(rdata, ttl)
 
-            # Configure dnssec status for member zone
-            status = str(1 if nb_zone.dnssec_policy else 0)
-            rid = dns.name.from_text(f"enabled.dnssec", ptr_name)
-            rdata = dns.rdata.from_text(dns.rdataclass.IN, dns.rdatatype.TXT, status)
-            rdataset = zone.find_rdataset(rid, dns.rdatatype.TXT, create=True)
-            rdataset.add(rdata, ttl)
+            ## Configure dnssec status for member zone
+            #status = str(1 if nb_zone.dnssec_policy else 0)
+            #rid = dns.name.from_text("enabled.dnssec.ext", ptr_name)
+            #rdata = dns.rdata.from_text(dns.rdataclass.IN, dns.rdatatype.TXT, status)
+            #rdataset = zone.find_rdataset(rid, dns.rdatatype.TXT, create=True)
+            #rdataset.add(rdata, ttl)
 
         # SOA Record components
         ttl = 3600

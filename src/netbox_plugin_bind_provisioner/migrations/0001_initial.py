@@ -11,23 +11,40 @@ class Migration(migrations.Migration):
     initial = True
 
     dependencies = [
-        ('extras', '0133_make_cf_minmax_decimal'),
+        ("extras", "0133_make_cf_minmax_decimal"),
     ]
 
     operations = [
         migrations.CreateModel(
-            name='IntegerKeyValueSetting',
+            name="IntegerKeyValueSetting",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False)),
-                ('created', models.DateTimeField(auto_now_add=True, null=True)),
-                ('last_updated', models.DateTimeField(auto_now=True, null=True)),
-                ('custom_field_data', models.JSONField(blank=True, default=dict, encoder=utilities.json.CustomFieldJSONEncoder)),
-                ('key', models.CharField(max_length=64)),
-                ('value', models.IntegerField()),
-                ('tags', taggit.managers.TaggableManager(through='extras.TaggedItem', to='extras.Tag')),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True, primary_key=True, serialize=False
+                    ),
+                ),
+                ("created", models.DateTimeField(auto_now_add=True, null=True)),
+                ("last_updated", models.DateTimeField(auto_now=True, null=True)),
+                (
+                    "custom_field_data",
+                    models.JSONField(
+                        blank=True,
+                        default=dict,
+                        encoder=utilities.json.CustomFieldJSONEncoder,
+                    ),
+                ),
+                ("key", models.CharField(max_length=64)),
+                ("value", models.IntegerField()),
+                (
+                    "tags",
+                    taggit.managers.TaggableManager(
+                        through="extras.TaggedItem", to="extras.Tag"
+                    ),
+                ),
             ],
             options={
-                'abstract': False,
+                "abstract": False,
             },
             bases=(netbox.models.deletion.DeleteMixin, models.Model),
         ),

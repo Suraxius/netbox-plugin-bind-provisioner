@@ -5,7 +5,7 @@ from django.utils.translation import gettext_lazy as _
 from django.dispatch import receiver
 from django.conf import settings
 
-__version__ = "0.9.9"
+__version__ = "1.0.0"
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +31,7 @@ class BindProvisionerConfig(PluginConfig):
             raise RuntimeError(
                 f"{self.name}: Plugin {self.verbose_name} failed to initialize due to missing settings. Terminating Netbox."
             )
+
 
 config = BindProvisionerConfig
 default_app_config = ".apps.NetboxBindProvisionerConfig"

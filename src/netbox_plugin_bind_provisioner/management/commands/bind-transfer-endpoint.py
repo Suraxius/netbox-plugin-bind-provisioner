@@ -22,9 +22,10 @@ from netbox_dns.choices import ZoneStatusChoices, RecordStatusChoices
 from datetime import datetime
 from netbox_plugin_bind_provisioner.models import IntegerKeyValueSetting
 
-logger = logging.getLogger('bind-transfer-endpoint')
+logger = logging.getLogger("bind-transfer-endpoint")
 
-class CatalogZone():
+
+class CatalogZone:
     lock = threading.Lock()
     _serial_max = 0xFFFFFFFF
     _serial_obj = None
@@ -35,12 +36,19 @@ class CatalogZone():
     @classmethod
     def initSerial(cls):
         try:
-            cls._serial_obj = IntegerKeyValueSetting.objects.get(key="catalog-zone-soa-serial")
-            logger.debug(f"Catalog zone SOA serial number {cls._serial_obj.value} loaded from database")
+            cls._serial_obj = IntegerKeyValueSetting.objects.get(
+                key="catalog-zone-soa-serial"
+            )
+            logger.debug(
+                f"Catalog zone SOA serial number {cls._serial_obj.value} loaded from database"
+            )
         except IntegerKeyValueSetting.DoesNotExist:
-            cls._serial_obj = IntegerKeyValueSetting.objects.create(key="catalog-zone-soa-serial", value=1)
-            logger.debug(f"Catalog zone SOA serial number was not set in the database. Set to {cls._serial_obj.value}")
-
+            cls._serial_obj = IntegerKeyValueSetting.objects.create(
+                key="catalog-zone-soa-serial", value=1
+            )
+            logger.debug(
+                f"Catalog zone SOA serial number was not set in the database. Set to {cls._serial_obj.value}"
+            )
 
     @classmethod
     def _incrementSerial(cls):
@@ -53,19 +61,24 @@ class CatalogZone():
             )
             cls._serial_obj = 1
             cls._serial_obj.save()
-            logger.debug(f"Catalog zone SOA serial number incremented to {_serial_obj.value}")
-
+            logger.debug(
+                f"Catalog zone SOA serial number incremented to {_serial_obj.value}"
+            )
 
     @classmethod
     def create(cls, name, view_name):
         # Synchronize following across threads as TCP and UDP listener both use it.
         with cls.lock:
-            #cls = self.__class__
-            #datestamp = datetime.now().strftime("%y%m%d")
-            #latest_zone = Zone.objects.filter().order_by("-last_updated").first()
-            latest_zone = Zone.objects.filter(status=ZoneStatusChoices.STATUS_ACTIVE).order_by('-last_updated').first()
+            # cls = self.__class__
+            # datestamp = datetime.now().strftime("%y%m%d")
+            # latest_zone = Zone.objects.filter().order_by("-last_updated").first()
+            latest_zone = (
+                Zone.objects.filter(status=ZoneStatusChoices.STATUS_ACTIVE)
+                .order_by("-last_updated")
+                .first()
+            )
 
-            last_zone_update = getattr(latest_zone, 'last_updated', None)
+            last_zone_update = getattr(latest_zone, "last_updated", None)
 
             # Check if there was a zone updated since last call
             # If no zone was found previously then this will be false since (None != None) = False
@@ -112,7 +125,7 @@ class CatalogZone():
                 # Configure policy
                 rid = dns.name.from_text("group", ptr_name)
                 policy_name = nb_zone.dnssec_policy.name.rstrip(" ")
-                group_name = f'dnssec-policy-{policy_name}'
+                group_name = f"dnssec-policy-{policy_name}"
                 rdata = dns.rdata.from_text(
                     dns.rdataclass.IN, dns.rdatatype.TXT, group_name
                 )
@@ -120,11 +133,11 @@ class CatalogZone():
                 rdataset.add(rdata, ttl)
 
             ## Configure dnssec status for member zone
-            #status = str(1 if nb_zone.dnssec_policy else 0)
-            #rid = dns.name.from_text("enabled.dnssec.ext", ptr_name)
-            #rdata = dns.rdata.from_text(dns.rdataclass.IN, dns.rdatatype.TXT, status)
-            #rdataset = zone.find_rdataset(rid, dns.rdatatype.TXT, create=True)
-            #rdataset.add(rdata, ttl)
+            # status = str(1 if nb_zone.dnssec_policy else 0)
+            # rid = dns.name.from_text("enabled.dnssec.ext", ptr_name)
+            # rdata = dns.rdata.from_text(dns.rdataclass.IN, dns.rdatatype.TXT, status)
+            # rdataset = zone.find_rdataset(rid, dns.rdatatype.TXT, create=True)
+            # rdataset.add(rdata, ttl)
 
         # SOA Record components
         ttl = 3600
@@ -152,7 +165,6 @@ class CatalogZone():
         # Add to the origin node in the zone
         node = zone.find_node(origin, create=True)
         node.rdatasets.append(soa_rdataset)
-
 
         # NS record for catz.
         ns_name = dns.name.from_text("invalid", dns.name.root)
@@ -189,10 +201,14 @@ class CatalogZone():
                     serial = int(f.read().strip())
                     cls._serial_obj.value = int(serial)
                     cls._serial_obj.save()
-                    logger.info(f"Legacy catalog serial file {file_path} imported into database and file removed. Serial is now {serial}")
+                    logger.info(
+                        f"Legacy catalog serial file {file_path} imported into database and file removed. Serial is now {serial}"
+                    )
                     os.remove(file_path)
             except OSError as e:
-                logger.error(f"Failed to import catalog zone serial from legacy file {file_path}")
+                logger.error(
+                    f"Failed to import catalog zone serial from legacy file {file_path}"
+                )
 
 
 class DNSBaseRequestHandler(socketserver.BaseRequestHandler):
@@ -201,7 +217,9 @@ class DNSBaseRequestHandler(socketserver.BaseRequestHandler):
         # Find the zone
         try:
             nb_zone = Zone.objects.get(
-                name=zone_name, view__name=view_name, status=ZoneStatusChoices.STATUS_ACTIVE
+                name=zone_name,
+                view__name=view_name,
+                status=ZoneStatusChoices.STATUS_ACTIVE,
             )
         except Zone.DoesNotExist:
             return None
@@ -240,7 +258,9 @@ class DNSBaseRequestHandler(socketserver.BaseRequestHandler):
             if name not in rdatasets_dict:
                 rdatasets_dict[name] = {}
             if rdtype not in rdatasets_dict[name]:
-                rdatasets_dict[name][rdtype] = dns.rdataset.Rdataset(dns.rdataclass.IN, rdtype)
+                rdatasets_dict[name][rdtype] = dns.rdataset.Rdataset(
+                    dns.rdataclass.IN, rdtype
+                )
 
             # Add the rdata to the appropriate rdataset
             rdatasets_dict[name][rdtype].add(rdata, ttl)
@@ -250,7 +270,9 @@ class DNSBaseRequestHandler(socketserver.BaseRequestHandler):
             for rdtype, rdataset in rdtypes.items():
                 # Ensure rdataset has the same rdclass as the zone
                 if rdataset.rdclass != zone.rdclass:
-                    raise ValueError(f"rdataset rdclass {rdataset.rdclass} does not match zone rdclass {zone.rdclass}")
+                    raise ValueError(
+                        f"rdataset rdclass {rdataset.rdclass} does not match zone rdclass {zone.rdclass}"
+                    )
 
                 # Check if the rdataset has any rdata before creating an RRset
                 if not rdataset:
@@ -261,10 +283,11 @@ class DNSBaseRequestHandler(socketserver.BaseRequestHandler):
                 zone.replace_rdataset(name, rdataset)
         return zone
 
-
     def denyRequestBadTSIG(self, wire, tsig_error: dns.rcode):
         # Use empty keyring to parse TSIG without validating
-        query = dns.message.from_wire(wire, keyring={}, ignore_trailing=True, continue_on_error=True)
+        query = dns.message.from_wire(
+            wire, keyring={}, ignore_trailing=True, continue_on_error=True
+        )
 
         # Make a response
         response = dns.message.make_response(query)
@@ -275,7 +298,7 @@ class DNSBaseRequestHandler(socketserver.BaseRequestHandler):
             response.use_tsig(
                 keyring={},  # empty; we're not signing
                 keyname=query.keyname,
-                tsig_error=tsig_error
+                tsig_error=tsig_error,
             )
         self.denyRequest(query)
 
@@ -298,7 +321,7 @@ class UDPRequestHandler(DNSBaseRequestHandler):
                 data,
                 keyring=self.server.keyring,
                 continue_on_error=False,
-                ignore_trailing=True
+                ignore_trailing=True,
             )
         except Exception as e:
             logger.error("Error parsing query: ", e)
@@ -319,7 +342,9 @@ class UDPRequestHandler(DNSBaseRequestHandler):
 
         # Only process SOA queries
         if qtype != dns.rdatatype.SOA:
-            logger.warning(f"Request denied from {peer}: Request was not SOA (Type: {qtype})")
+            logger.warning(
+                f"Request denied from {peer}: Request was not SOA (Type: {qtype})"
+            )
             self.denyRequest(query)
             return
 
@@ -334,7 +359,9 @@ class UDPRequestHandler(DNSBaseRequestHandler):
         # Check if key matches a view
         nb_view = self.server.tsig_view_map.get(key_name)
         if not nb_view:
-            logger.warning(f"Request denied from {peer}: {key_name} does not match a view")
+            logger.warning(
+                f"Request denied from {peer}: {key_name} does not match a view"
+            )
             self.denyRequestBadTSIG(wire, dns.rcode.BADKEY)
             return
 
@@ -354,7 +381,7 @@ class UDPRequestHandler(DNSBaseRequestHandler):
         soa_rdataset = zone.get_rdataset(zone.origin, dns.rdatatype.SOA)
 
         # We assume that the SOA rdataset has at least one record (it usually does).
-        soa_rdata = soa_rdataset[0] # Get the first SOA record
+        soa_rdata = soa_rdataset[0]  # Get the first SOA record
 
         # Now, create the rrset from the soa_rdata
         rrset = dns.rrset.from_rdata(zone.origin, soa_rdataset.ttl, soa_rdata)
@@ -366,15 +393,21 @@ class UDPRequestHandler(DNSBaseRequestHandler):
         if query.had_tsig:
             # If key was found in DB
             if query.keyname in self.server.keyring:
-                response.use_tsig(self.server.keyring, keyname=query.keyname, original_id=query.id)
+                response.use_tsig(
+                    self.server.keyring, keyname=query.keyname, original_id=query.id
+                )
             else:
                 # If key is unknown
                 response.set_rcode(dns.rcode.REFUSED)
                 # Generate new key for keyname provided
-                #keyname = query.keyname
-                #b64 = base64.b64encode(urandom(32)).decode("ascii")
-                #newkey = dns.tsigkeyring.from_text({ keyname: b64 })
-                response.use_tsig(self.server.keyring, keyname=query.keyname, tsig_error=dns.rcode.BADKEY)
+                # keyname = query.keyname
+                # b64 = base64.b64encode(urandom(32)).decode("ascii")
+                # newkey = dns.tsigkeyring.from_text({ keyname: b64 })
+                response.use_tsig(
+                    self.server.keyring,
+                    keyname=query.keyname,
+                    tsig_error=dns.rcode.BADKEY,
+                )
 
         # Send back the response
         response_wire = response.to_wire(max_size=512)
@@ -409,7 +442,7 @@ class TCPRequestHandler(DNSBaseRequestHandler):
             while len(wire) < length:
                 chunk = sock.recv(length - len(wire))
                 if not chunk:
-                    return # connection closed
+                    return  # connection closed
                 wire += chunk
 
             # Parse the query
@@ -418,7 +451,9 @@ class TCPRequestHandler(DNSBaseRequestHandler):
                 query = dns.message.from_wire(wire, keyring=self.server.keyring)
             # If TSIG signature doesnt match our key, refuse query:
             except dns.tsig.BadSignature as e:
-                logger.warning(f"Request denied from {peer} failed TSIG verification: {e}")
+                logger.warning(
+                    f"Request denied from {peer} failed TSIG verification: {e}"
+                )
                 self.denyRequestBadTSIG(wire, dns.rcode.BADSIG)
                 return
             # If TSIG Key used is not in our list, refuse query:
@@ -440,8 +475,10 @@ class TCPRequestHandler(DNSBaseRequestHandler):
 
             # Only process AXFR queries
             if qtype != dns.rdatatype.AXFR:
-            #if qtype != dns.rdatatype.AXFR or qtype != dns.rdatatype.SOA:
-                logger.warning(f"Request denied from {peer}: Request was not AXFR (Type: {qtype})")
+                # if qtype != dns.rdatatype.AXFR or qtype != dns.rdatatype.SOA:
+                logger.warning(
+                    f"Request denied from {peer}: Request was not AXFR (Type: {qtype})"
+                )
                 self.denyRequest(query)
                 return
 
@@ -456,7 +493,9 @@ class TCPRequestHandler(DNSBaseRequestHandler):
             # Check if the key matches a view
             nb_view = self.server.tsig_view_map.get(key_name)
             if not nb_view:
-                logger.warning(f"Request denied from {peer}: {key_name} does not match a view")
+                logger.warning(
+                    f"Request denied from {peer}: {key_name} does not match a view"
+                )
                 self.denyRequest(query)
                 return
 
@@ -493,7 +532,10 @@ class TCPRequestHandler(DNSBaseRequestHandler):
 
             # 2. Create a Renderer for the first message
             r = dns.renderer.Renderer(
-                id=query.id, flags=(dns.flags.QR | dns.flags.AA), max_size=MAX_WIRE, origin=None
+                id=query.id,
+                flags=(dns.flags.QR | dns.flags.AA),
+                max_size=MAX_WIRE,
+                origin=None,
             )
             r.add_question(
                 query.question[0].name,
@@ -528,7 +570,10 @@ class TCPRequestHandler(DNSBaseRequestHandler):
 
                     # Start new renderer
                     r = dns.renderer.Renderer(
-                        id=query.id, flags=(dns.flags.QR | dns.flags.AA), max_size=MAX_WIRE, origin=None
+                        id=query.id,
+                        flags=(dns.flags.QR | dns.flags.AA),
+                        max_size=MAX_WIRE,
+                        origin=None,
                     )
                     r.add_question(
                         query.question[0].name,
@@ -554,14 +599,14 @@ class TCPRequestHandler(DNSBaseRequestHandler):
             wire = r.get_wire()
             self.request.sendall(len(wire).to_bytes(2, "big") + wire)
 
-            #logger.debug(f"Zone transfer request for {nb_view.name}/{dname} from {peer}")
+            # logger.debug(f"Zone transfer request for {nb_view.name}/{dname} from {peer}")
             logger.debug(f"{peer} AXFR {nb_view.name}/{dname}")
 
         except Exception as e:
             logger.error(f"Error handling request from {peer}: {e}")
             import traceback
-            traceback.print_exc()
 
+            traceback.print_exc()
 
 
 class TCPDNSServer(socketserver.TCPServer):
@@ -573,7 +618,6 @@ class TCPDNSServer(socketserver.TCPServer):
         self.tsig_view_map = tsig_view_map
 
 
-
 class UDPDNSServer(socketserver.UDPServer):
     allow_reuse_address = True
 
@@ -583,12 +627,13 @@ class UDPDNSServer(socketserver.UDPServer):
         self.tsig_view_map = tsig_view_map
 
 
-
 class Command(BaseCommand):
     help = "Run a minimal AXFR DNS server using NetBox DNS plugin data"
 
     def loadSettings(self):
-        self.settings = settings.PLUGINS_CONFIG.get("netbox_plugin_bind_provisioner", None)
+        self.settings = settings.PLUGINS_CONFIG.get(
+            "netbox_plugin_bind_provisioner", None
+        )
         if not self.settings:
             raise RuntimeError(
                 "Command failed to initialize due to missing settings. Terminating Netbox."
@@ -596,9 +641,7 @@ class Command(BaseCommand):
 
         self.tsig_keys = self.settings.get("tsig_keys", None)
         if not self.tsig_keys:
-            raise RuntimeError(
-                "tsig_keys variable not set in plugin settings."
-            )
+            raise RuntimeError("tsig_keys variable not set in plugin settings.")
 
     # Load TSIG keys and map them to views
     def loadTSIGKeySettings(self):
@@ -642,33 +685,42 @@ class Command(BaseCommand):
             raise RuntimeError(msg)
 
     def add_arguments(self, parser):
-        parser.add_argument('--port', type=int, default=5354, help='Port number to listen on')
-        parser.add_argument('--address', type=str, default="0.0.0.0", help='IP to bind to')
+        parser.add_argument(
+            "--port", type=int, default=5354, help="Port number to listen on"
+        )
+        parser.add_argument(
+            "--address", type=str, default="0.0.0.0", help="IP to bind to"
+        )
 
     def handle(self, *args, **options):
         # Load parameters
-        port = options['port']
-        address = options['address']
+        port = options["port"]
+        address = options["address"]
         CatalogZone.initSerial()
         # Initialize settings
         self.loadSettings()
-        #self.loadCatalogZoneSettings()
+        # self.loadCatalogZoneSettings()
         self.loadTSIGKeySettings()
         # Following is temporary. Function and invocation can be deleted once v1.0 is reached.
         serial_file = self.settings.get("catalog_serial_file", None)
         if serial_file:
             CatalogZone.importLegacySerialFile(serial_file)
 
-        udp_server = UDPDNSServer((address, port), UDPRequestHandler, self.keyring, self.tsig_view_map)
-        tcp_server = TCPDNSServer((address, port), TCPRequestHandler, self.keyring, self.tsig_view_map)
+        udp_server = UDPDNSServer(
+            (address, port), UDPRequestHandler, self.keyring, self.tsig_view_map
+        )
+        tcp_server = TCPDNSServer(
+            (address, port), TCPRequestHandler, self.keyring, self.tsig_view_map
+        )
 
         def run_udp_server(server):
             logger.debug(f"SOA endpoint listening on {address} udp/{port}")
             server.serve_forever()
 
-        udp_thread = threading.Thread(target=run_udp_server, args=(udp_server,), daemon=True)
+        udp_thread = threading.Thread(
+            target=run_udp_server, args=(udp_server,), daemon=True
+        )
         udp_thread.start()
 
         logger.debug(f"AXFR endpoint listening on {address} tcp/{port}")
         tcp_server.serve_forever()
-

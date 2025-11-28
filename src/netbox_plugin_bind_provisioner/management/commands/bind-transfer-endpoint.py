@@ -246,10 +246,21 @@ class DNSBaseRequestHandler(socketserver.BaseRequestHandler):
             # If the record has no TTL, use the zone default
             ttl = record.ttl or nb_zone.default_ttl
 
+            # Apply special quoting for TXT records to stop tokanizer
+            # from cutting it up:
+            if rdtype == dns.rdatatype.TXT:
+                if len(record.value) <= 255:
+                    record_value = f'"{record.value}"'
+                else:
+                    chunks = ['"{}"'.format(record.value[i:i+255]) for i in range(0, len(record.value), 255)]
+                    record_value = " ".join(chunks)
+            else:
+                record_value = record.value
+
             rdata = dns.rdata.from_text(
                 dns.rdataclass.IN,
                 rdtype,
-                record.value,
+                record_value, #asd
                 relativize=False,
                 origin=zone.origin,
             )
@@ -282,6 +293,7 @@ class DNSBaseRequestHandler(socketserver.BaseRequestHandler):
                 # Replace the rdataset for the given name and type
                 zone.replace_rdataset(name, rdataset)
         return zone
+
 
     def denyRequestBadTSIG(self, wire, tsig_error: dns.rcode):
         # Use empty keyring to parse TSIG without validating

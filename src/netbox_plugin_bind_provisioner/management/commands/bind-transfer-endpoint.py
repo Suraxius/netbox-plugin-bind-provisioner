@@ -1,6 +1,7 @@
 import logging
 import socketserver
 import os
+#import re
 import threading
 import dns.query
 import dns.message
@@ -246,21 +247,25 @@ class DNSBaseRequestHandler(socketserver.BaseRequestHandler):
             # If the record has no TTL, use the zone default
             ttl = record.ttl or nb_zone.default_ttl
 
-            # Apply special quoting for TXT records to stop tokanizer
+            # Apply quoting for TXT records to stop tokanizer
             # from cutting it up:
+            value = record.value
             if rdtype == dns.rdatatype.TXT:
-                if len(record.value) <= 255:
-                    record_value = f'"{record.value}"'
-                else:
-                    chunks = ['"{}"'.format(record.value[i:i+255]) for i in range(0, len(record.value), 255)]
-                    record_value = " ".join(chunks)
-            else:
-                record_value = record.value
+                if not value.startswith('"') and not value.endswith('"'):
+                    value = value.replace('"', '\\"')
+                    if len(value) <= 255:
+                        value = f'"{value}"'
+                    else:
+                        # This is a bug fix for netbox. If netbox allowed for
+                        # an unquoted value to be larger then 255 characters,
+                        # it misunderstood everything behind a ; as a comment.
+                        chunks = ['"{}"'.format(value[i:i+255]) for i in range(0, len(value), 255)]
+                        value = " ".join(chunks)
 
             rdata = dns.rdata.from_text(
                 dns.rdataclass.IN,
                 rdtype,
-                record_value, #asd
+                value,
                 relativize=False,
                 origin=zone.origin,
             )

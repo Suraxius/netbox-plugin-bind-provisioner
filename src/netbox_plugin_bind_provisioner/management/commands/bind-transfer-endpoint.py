@@ -251,16 +251,17 @@ class DNSBaseRequestHandler(socketserver.BaseRequestHandler):
             # from cutting it up:
             value = record.value
             if rdtype == dns.rdatatype.TXT:
-                if not value.startswith('"') and not value.endswith('"'):
-                    value = value.replace('"', '\\"')
-                    if len(value) <= 255:
-                        value = f'"{value}"'
-                    else:
-                        # This is a bug fix for netbox. If netbox allowed for
-                        # an unquoted value to be larger then 255 characters,
-                        # it misunderstood everything behind a ; as a comment.
-                        chunks = ['"{}"'.format(value[i:i+255]) for i in range(0, len(value), 255)]
-                        value = " ".join(chunks)
+                if value.startswith('"') and value.endswith('"'):
+                    value = value[1:-1].replace('" "', '').replace('"', '\"')
+
+                if len(value) > 255:
+                    # This is a bug fix for netbox. If netbox allowed for
+                    # an unquoted value to be larger then 255 characters,
+                    # it misunderstood everything behind a ; as a comment.
+                    chunks = ['"{}"'.format(value[i:i+255]) for i in range(0, len(value), 255)]
+                    value = " ".join(chunks)
+                else:
+                    value = f'"{value}"'
 
             rdata = dns.rdata.from_text(
                 dns.rdataclass.IN,

@@ -5,7 +5,7 @@ from django.utils.translation import gettext_lazy as _
 from django.dispatch import receiver
 from django.conf import settings
 
-__version__ = "1.0.3"
+__version__ = "1.0.4"
 
 logger = logging.getLogger(__name__)
 

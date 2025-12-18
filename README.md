@@ -1,7 +1,19 @@
 # Netbox Bind Provisioner
-A NetBox plugin that implements a lightweight DNS server to automate the
-provisioning and configuration of a BIND9 server based on DNS records
-maintained in NetBox. (netbox-plugin-dns).
+The Netbox Bind Provisioner plugin implements a lightweight DNS server inside
+Netbox and builds a bridge for BIND and other DNS Servers implementing RFC9432
+to retrieve DNS Zones directly from Netbox using DNS native mechanisms.
+
+[![PyPi](https://img.shields.io/pypi/v/netbox-plugin-bind-provisioner)](https://pypi.org/project/netbox-plugin-bind-provisioner/)
+[![Stars Badge](https://img.shields.io/github/stars/suraxius/netbox-plugin-bind-provisioner?style=flat)](https://github.com/suraxius/netbox-plugin-bind-provisioner/stargazers)
+[![Forks Badge](https://img.shields.io/github/forks/suraxius/netbox-plugin-bind-provisioner?style=flat)](https://github.com/suraxius/netbox-plugin-bind-provisioner/network/members)
+[![Issues Badge](https://img.shields.io/github/issues/suraxius/netbox-plugin-bind-provisioner)](https://github.com/suraxius/netbox-plugin-bind-provisioner/issues)
+[![Pull Requests Badge](https://img.shields.io/github/issues-pr/suraxius/netbox-plugin-bind-provisioner)](https://github.com/suraxius/netbox-plugin-bind-provisioner/pulls)
+[![GitHub contributors](https://img.shields.io/github/contributors/suraxius/netbox-plugin-bind-provisioner?color=2b9348)](https://github.com/suraxius/netbox-plugin-bind-provisioner/graphs/contributors)
+[![License Badge](https://img.shields.io/github/license/suraxius/netbox-plugin-bind-provisioner?color=2b9348)](https://github.com/suraxius/netbox-plugin-bind-provisioner/blob/master/LICENSE)
+[![Code Style Black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+[![Downloads](https://static.pepy.tech/personalized-badge/netbox-plugin-bind-provisioner?period=total&left_color=BLACK&right_color=BLUE&left_text=Downloads)](https://pepy.tech/project/netbox-plugin-bind-provisioner)
+[![Downloads/Week](https://static.pepy.tech/personalized-badge/netbox-plugin-bind-provisioner?period=monthly&left_color=BLACK&right_color=BLUE&left_text=Downloads%2fMonth)](https://pepy.tech/project/netbox-plugin-bind-provisioner)
+[![Downloads/Month](https://static.pepy.tech/personalized-badge/netbox-plugin-bind-provisioner?period=weekly&left_color=BLACK&right_color=BLUE&left_text=Downloads%2fWeek)](https://pepy.tech/project/netbox-plugin-bind-provisioner)
 
 ## Plugin configuration
 The plugin has been reworked: instead of exporting zone files, it now provides

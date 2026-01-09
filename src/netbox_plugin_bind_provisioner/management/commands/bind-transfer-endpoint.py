@@ -107,13 +107,14 @@ class CatalogZone:
         ptr_base = dns.name.from_text("zones", origin)
 
         for nb_zone in nb_zones:
-            ttl = nb_zone.soa_ttl
+            ttl = 0
             qname = dns.name.from_text(nb_zone.name, dns.name.root)
             # zone_id = sha256(qname.to_text().encode()).hexdigest()[0:63]
             zone_id = str(nb_zone.id)
 
             # Create PTR record
-            ptr_name = dns.name.from_text(zone_id, ptr_base)
+            p_name = f"zid-{zone_id:>06}"
+            ptr_name = dns.name.from_text(p_name, ptr_base)
             assert ptr_name.is_subdomain(origin)
             rdata = dns.rdata.from_text(
                 dns.rdataclass.IN, dns.rdatatype.PTR, qname.to_text()
@@ -141,16 +142,16 @@ class CatalogZone:
             # rdataset.add(rdata, ttl)
 
         # SOA Record components
-        ttl = 3600
+        ttl = 0
         rclass = dns.rdataclass.IN
         rtype = dns.rdatatype.SOA
-        mname = dns.name.root  # dns.name.from_text("invalid.", origin)
-        rname = dns.name.root  # dns.name.from_text("contact.master.", origin)
+        mname = dns.name.from_text("invalid.", origin)
+        rname = dns.name.from_text("invalid.", origin)
         serial = cls._serial_obj.value
         refresh = 60
         retry = 10
         expire = 1209600
-        minimum = 86400
+        minimum = 0
 
         # Create SOA rdata object
         soa_rdata = dns.rdata.from_text(
@@ -173,7 +174,7 @@ class CatalogZone:
             dns.rdataclass.IN, dns.rdatatype.NS, str(ns_name)
         )
         ns_rdataset = dns.rdataset.Rdataset(dns.rdataclass.IN, dns.rdatatype.NS)
-        ns_rdataset.add(ns_rdata, 86400)
+        ns_rdataset.add(ns_rdata, 0)
 
         # Add to node (catz. is the origin)
         ns_node = zone.find_node(origin, create=True)
@@ -186,7 +187,7 @@ class CatalogZone:
         txt_rdata = dns.rdata.from_text(dns.rdataclass.IN, dns.rdatatype.TXT, '"2"')
 
         txt_rdataset = dns.rdataset.Rdataset(dns.rdataclass.IN, dns.rdatatype.TXT)
-        txt_rdataset.add(txt_rdata, 86400)
+        txt_rdataset.add(txt_rdata, 0)
 
         # Add to node version.catz.
         txt_node = zone.find_node(version_name, create=True)

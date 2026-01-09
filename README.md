@@ -48,7 +48,6 @@ Parameter | Description
 ### Plugin settings
 Setting             | Description
 --------------------| ---------------------------------------------------------
-catalog_serial_file | !!!NO LONGER USED!!! Replaced by DB entry.
 tsig_keys           | Maps a TSIG Key to be used for each view.
 
 ## Installation guide

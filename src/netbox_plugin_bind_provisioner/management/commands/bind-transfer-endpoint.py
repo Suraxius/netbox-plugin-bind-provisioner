@@ -194,23 +194,6 @@ class CatalogZone:
 
         return zone
 
-    @classmethod
-    def importLegacySerialFile(cls, file_path):
-        if os.path.exists(file_path):
-            try:
-                with open(file_path, "r") as f:
-                    serial = int(f.read().strip())
-                    cls._serial_obj.value = int(serial)
-                    cls._serial_obj.save()
-                    logger.info(
-                        f"Legacy catalog serial file {file_path} imported into database and file removed. Serial is now {serial}"
-                    )
-                    os.remove(file_path)
-            except OSError as e:
-                logger.error(
-                    f"Failed to import catalog zone serial from legacy file {file_path}"
-                )
-
 
 class DNSBaseRequestHandler(socketserver.BaseRequestHandler):
     # getZoneFromNB rewritten
@@ -715,18 +698,15 @@ class Command(BaseCommand):
         port = options["port"]
         address = options["address"]
         CatalogZone.initSerial()
+
         # Initialize settings
         self.loadSettings()
-        # self.loadCatalogZoneSettings()
         self.loadTSIGKeySettings()
-        # Following is temporary. Function and invocation can be deleted once v1.0 is reached.
-        serial_file = self.settings.get("catalog_serial_file", None)
-        if serial_file:
-            CatalogZone.importLegacySerialFile(serial_file)
 
         udp_server = UDPDNSServer(
             (address, port), UDPRequestHandler, self.keyring, self.tsig_view_map
         )
+
         tcp_server = TCPDNSServer(
             (address, port), TCPRequestHandler, self.keyring, self.tsig_view_map
         )
@@ -738,6 +718,7 @@ class Command(BaseCommand):
         udp_thread = threading.Thread(
             target=run_udp_server, args=(udp_server,), daemon=True
         )
+
         udp_thread.start()
 
         logger.debug(f"AXFR endpoint listening on {address} tcp/{port}")

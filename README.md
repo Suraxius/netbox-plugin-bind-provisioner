@@ -16,29 +16,28 @@ to retrieve DNS Zones directly from Netbox using DNS native mechanisms.
 [![Downloads/Month](https://static.pepy.tech/personalized-badge/netbox-plugin-bind-provisioner?period=weekly&left_color=BLACK&right_color=BLUE&left_text=Downloads%2fWeek)](https://pepy.tech/project/netbox-plugin-bind-provisioner)
 
 ## Plugin configuration
-The plugin has been reworked: instead of exporting zone files, it now provides
-a minimal DNS server that is fed directly from NetBox’s DNS data. This server
-also exposes specialized catalog zones that BIND uses to automatically discover
-newly created zones and remove deleted ones. The plugin supports BIND views and
-basic DNS security via TSIG.
+While providing Zone transfers via AXFR, the Server also exposes specialized
+catalog zones that BIND and other RFC9432 compliant DNS Servers use to
+automatically discover newly created zones and remove deleted ones. The plugin
+supports views and basic DNS security via TSIG.
 
-The plugin exposes one catalog zone per view. Each catalog zone is available
-under the special zone name **"catz"** and can be queried through the built-in
-DNS server like any other zone.
+The plugin exposes one catalog zone per view. Each catalog zone is made available
+under the special zone name **"catz"** and addtionally under **"[viewname].catz"**
+and may be queried through the built-in DNS server just like any other dns zone.
 
 For proper operation, each view requires an installed TSIG key, and the
 `bind-transfer-endpoint` must be running as a separate background service using
 the `manage.py` command. Note that DNSSEC support will be added once BIND9
 provides a mechanism to configure it through the Catalog Zones system.
 
-To start the service:
+To start the service in the foreground:
 ```
 manage.py bind-transfer-endpoint --port 5354
 ```
+This process needs to be scheduled as a background service for the built-in DNS
+Server to work correctly. For Linux users with Systemd (Ubuntu, etc), Matt Kollross
+provides a startup unit and instructions [here](docs/install-systemd-service.md).
 
-When configuring the plugin, you need to provide a path on the filesystem for
-this file where the plugin can create and manage it. Please do not update it by
-hand or remove it unless you know what you are doing.
 
 ### Service parameters
 Parameter | Description
@@ -127,6 +126,7 @@ This guide assumes:
     ```
 
 5. Start listener
+
     This step runs the DNS endpoint used by bind to configure itself. You may want
     to write a service wrapper that runs this in the background.
     A guide for setting up a systemd service on Ubuntu is provided by Matt

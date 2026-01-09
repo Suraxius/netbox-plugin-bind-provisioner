@@ -1,7 +1,6 @@
 import logging
 import socketserver
 import os
-#import re
 import threading
 import dns.query
 import dns.message
@@ -14,7 +13,6 @@ import dns.rdtypes
 import dns.exception
 import dns.renderer
 
-# from hashlib import sha256
 from django.core.management.base import BaseCommand
 from django.conf import settings
 from django.utils import timezone
@@ -109,11 +107,9 @@ class CatalogZone:
         for nb_zone in nb_zones:
             ttl = 0
             qname = dns.name.from_text(nb_zone.name, dns.name.root)
-            # zone_id = sha256(qname.to_text().encode()).hexdigest()[0:63]
-            zone_id = str(nb_zone.id)
 
             # Create PTR record
-            p_name = f"zid-{zone_id:>06}"
+            p_name = f"zid-{nb_zone.id:09d}"
             ptr_name = dns.name.from_text(p_name, ptr_base)
             assert ptr_name.is_subdomain(origin)
             rdata = dns.rdata.from_text(
@@ -145,8 +141,8 @@ class CatalogZone:
         ttl = 0
         rclass = dns.rdataclass.IN
         rtype = dns.rdatatype.SOA
-        mname = dns.name.from_text("invalid.", origin)
-        rname = dns.name.from_text("invalid.", origin)
+        mname = dns.name.from_text("invalid", dns.name.root)
+        rname = dns.name.from_text("invalid", dns.name.root)
         serial = cls._serial_obj.value
         refresh = 60
         retry = 10
@@ -236,13 +232,16 @@ class DNSBaseRequestHandler(socketserver.BaseRequestHandler):
             value = record.value
             if rdtype == dns.rdatatype.TXT:
                 if value.startswith('"') and value.endswith('"'):
-                    value = value[1:-1].replace('" "', '').replace('"', '\"')
+                    value = value[1:-1].replace('" "', "").replace('"', '"')
 
                 if len(value) > 255:
                     # This is a bug fix for netbox. If netbox allowed for
                     # an unquoted value to be larger then 255 characters,
                     # it misunderstood everything behind a ; as a comment.
-                    chunks = ['"{}"'.format(value[i:i+255]) for i in range(0, len(value), 255)]
+                    chunks = [
+                        '"{}"'.format(value[i : i + 255])
+                        for i in range(0, len(value), 255)
+                    ]
                     value = " ".join(chunks)
                 else:
                     value = f'"{value}"'
@@ -283,7 +282,6 @@ class DNSBaseRequestHandler(socketserver.BaseRequestHandler):
                 # Replace the rdataset for the given name and type
                 zone.replace_rdataset(name, rdataset)
         return zone
-
 
     def denyRequestBadTSIG(self, wire, tsig_error: dns.rcode):
         # Use empty keyring to parse TSIG without validating

@@ -193,6 +193,11 @@ class CatalogZone:
 
 
 class DNSBaseRequestHandler(socketserver.BaseRequestHandler):
+    def __init__(self, request, client_address, server):
+        self.MAX_WIRE = 65535
+        self.RESERVED_TSIG = 300
+        super().__init__(request, client_address, server)
+
     # getZoneFromNB rewritten
     def getZoneFromNB(self, zone_name, view_name):
         # Find the zone
@@ -302,89 +307,25 @@ class DNSBaseRequestHandler(socketserver.BaseRequestHandler):
             )
         self.denyRequest(query)
 
+    def send_response(self, data):
+        raise NotImplemented
 
-class UDPRequestHandler(DNSBaseRequestHandler):
-    def denyRequest(self, query, rcode: dns.rcode = dns.rcode.REFUSED):
+    def deny_request(self, query, rcode: dns.rcode = dns.rcode.REFUSED):
         response = dns.message.make_response(query)
         response.set_rcode(rcode)
         wire = response.to_wire(multi=False)
-        sock = self.request[1]
-        sock.sendto(wire, self.client_address)
+        self.send_response(wire)
 
-    def handle(self):
-        data, sock = self.request
-        peer = self.client_address[0]
-        query = None
-
-        try:
-            query = dns.message.from_wire(
-                data,
-                keyring=self.server.keyring,
-                continue_on_error=False,
-                ignore_trailing=True,
-            )
-        except Exception as e:
-            logger.error("Error parsing query: ", e)
-            return
-
-        # Create a response
-        response = dns.message.make_response(query)
-
-        # Set the Authoritative Answer flag
-        response.flags |= dns.flags.AA
-
-        question = query.question[0]
-
-        # Get the queried record name and type:
-        qname = question.name
-        qtype = question.rdtype
-        dname = qname.to_text().rstrip(".")
-
-        # Only process SOA queries
-        if qtype != dns.rdatatype.SOA:
-            logger.warning(
-                f"Request denied from {peer}: Request was not SOA (Type: {qtype})"
-            )
-            self.denyRequest(query)
-            return
-
-        # Identify TSIG key used
-        if not query.had_tsig:
-            logger.warning(f"Request denied from {peer}: No TSIG key used")
-            self.denyRequest(query)
-            return
-
-        key_name = query.keyname.canonicalize().to_text()
-
-        # Check if key matches a view
-        nb_view = self.server.tsig_view_map.get(key_name)
-        if not nb_view:
-            logger.warning(
-                f"Request denied from {peer}: {key_name} does not match a view"
-            )
-            self.denyRequestBadTSIG(wire, dns.rcode.BADKEY)
-            return
-
-        # Check if catalog zone
-        if dname == "catz" or dname == f"{nb_view.name}.catz":
-            zone = CatalogZone.create(dname, nb_view.name)
-        # If generic zone, retreive from NB
-        else:
-            zone = self.getZoneFromNB(dname, nb_view.name)
-            # When zone was not found, let client know
-            if not zone:
-                logger.warning(f"Zone {nb_view.name}/{dname} not found in NB")
-                self.denyRequest(query)
-                return
-
-        # Retrieve the existing SOA record from the Zone
-        soa_rdataset = zone.get_rdataset(zone.origin, dns.rdatatype.SOA)
-
+    def handle_soa_request(self, query, soa_rrset, zone, peer, nb_view, dname):
         # We assume that the SOA rdataset has at least one record (it usually does).
-        soa_rdata = soa_rdataset[0]  # Get the first SOA record
+        soa_rdata = soa_rrset[0]  # Get the first SOA record
 
         # Now, create the rrset from the soa_rdata
-        rrset = dns.rrset.from_rdata(zone.origin, soa_rdataset.ttl, soa_rdata)
+        rrset = dns.rrset.from_rdata(zone.origin, soa_rrset.ttl, soa_rdata)
+
+        response = dns.message.make_response(query)
+        # Set the Authoritative Answer flag
+        response.flags |= dns.flags.AA
 
         # Append the rrset to the response's answer section
         response.answer.append(rrset)
@@ -409,27 +350,206 @@ class UDPRequestHandler(DNSBaseRequestHandler):
                     tsig_error=dns.rcode.BADKEY,
                 )
 
-        # Send back the response
-        response_wire = response.to_wire(max_size=512)
-        sock.sendto(response_wire, self.client_address)
+        data = response.to_wire(max_size=512)
+        self.send_response(data)
         logger.debug(f"{peer} SOA {nb_view.name}/{dname}")
+
+    def handle_axfr_request(self, query, zone, peer, nb_view, dname):
+        rrsets = []
+        soa_rrset = None
+        for name, rdataset in zone.iterate_rdatasets():
+            if not name.is_absolute():
+                name = name.concatenate(zone.origin)
+            rrset = dns.rrset.from_rdata_list(name, rdataset.ttl, rdataset)
+            if rdataset.rdtype == dns.rdatatype.SOA and soa_rrset is None:
+                soa_rrset = rrset
+            else:
+                rrsets.append(rrset)
+
+        rrsets.insert(0, soa_rrset)  # Opening SOA
+        rrsets.append(soa_rrset)  # Closing SOA
+
+        # 2. Create a Renderer for the first message
+        r = dns.renderer.Renderer(
+            id=query.id,
+            flags=(dns.flags.QR | dns.flags.AA),
+            max_size=self.MAX_WIRE,
+            origin=None,
+        )
+        r.add_question(
+            query.question[0].name,
+            query.question[0].rdtype,
+            query.question[0].rdclass,
+        )
+
+        # 3. Loop through RRsets
+        tsig_ctx = None
+        for rrset in rrsets:
+            # logger.debug(f"Iterating over rrset {rrset}. tsig_ctx: {tsig_ctx}")
+            try:
+                # logger.debug(f"Adding {rrset} to renderer object")
+                r.add_rrset(dns.renderer.ANSWER, rrset)
+                if r.max_size - len(r.output.getvalue()) < self.RESERVED_TSIG:
+                    raise dns.exception.TooBig("TSIG wont fit")
+            except dns.exception.TooBig:
+                # TSIG chain previous message
+                r.write_header()
+                tsig_ctx = r.add_multi_tsig(
+                    ctx=tsig_ctx,
+                    secret=self.server.keyring[query.keyname],
+                    keyname=query.keyname,
+                    fudge=300,
+                    id=query.id,
+                    tsig_error=0,
+                    other_data=b"",
+                    request_mac=r.mac if tsig_ctx else query.mac,
+                )
+                wire = r.get_wire()
+                self.request.sendall(len(wire).to_bytes(2, "big") + wire)
+
+                # Start new renderer
+                r = dns.renderer.Renderer(
+                    id=query.id,
+                    flags=(dns.flags.QR | dns.flags.AA),
+                    max_size=self.MAX_WIRE,
+                    origin=None,
+                )
+                r.add_question(
+                    query.question[0].name,
+                    query.question[0].rdtype,
+                    query.question[0].rdclass,
+                )
+                r.add_rrset(dns.renderer.ANSWER, rrset)
+
+        # 4. Final message with terminating TSIG
+        r.write_header()
+        # logger.debug(f"Final message. tsig_ctx: {tsig_ctx}")
+        tsig_ctx = r.add_multi_tsig(
+            ctx=tsig_ctx,
+            secret=self.server.keyring[query.keyname],
+            keyname=query.keyname,
+            fudge=300,
+            id=query.id,
+            tsig_error=0,
+            other_data=b"",
+            # request_mac=r.mac if tsig_ctx else None,
+            request_mac=r.mac if tsig_ctx else query.mac,
+        )
+        wire = r.get_wire()
+        self.send_response(wire)
+
+        logger.debug(f"{peer} AXFR {nb_view.name}/{dname}")
+
+    def handle_dns_query(self, wire):
+        peer = self.client_address[0]
+        try:
+            query = dns.message.from_wire(
+                wire,
+                keyring=self.server.keyring,
+                continue_on_error=False,
+                ignore_trailing=True
+            )
+        except dns.tsig.BadSignature as e:
+            logger.warning(
+                f"Request denied from {peer} failed TSIG verification: {e}"
+            )
+            self.denyRequestBadTSIG(wire, dns.rcode.BADSIG)
+            return
+        except dns.message.UnknownTSIGKey as e:
+            logger.warning(f"Request denied from {peer} with bad TSIG key: {e}")
+            self.denyRequestBadTSIG(wire, dns.rcode.BADKEY)
+            return
+        except Exception as e:
+            logger.error("Error parsing query: ", e)
+            return
+
+        # If there was no question in the query, refuse
+        if len(query.question) != 1:
+            self.deny_request(query)
+            return
+
+        question = query.question[0]
+        qname = question.name
+        qtype = question.rdtype
+        dname = qname.to_text().rstrip(".")
+
+        # Only process AXFR/SOA queris
+        if qtype not in (dns.rdatatype.AXFR, dns.rdatatype.SOA):
+            logger.warning(
+                f"Request denied from {peer}: Request was not AXFR or SOA (Type: {qtype})"
+            )
+            self.deny_request(query)
+            return
+
+        # Identify TSIG key used
+        if not query.had_tsig:
+            logger.warning(f"Request denied from {peer}: No TSIG key used")
+            self.deny_request(query)
+            return
+
+        key_name = query.keyname.canonicalize().to_text()
+
+        # Check if the key matches a view
+        nb_view = self.server.tsig_view_map.get(key_name)
+        if not nb_view:
+            logger.warning(
+                f"Request denied from {peer}: {key_name} does not match a view"
+            )
+            self.deny_request(query)
+            return
+
+        # Check if catalog zone
+        if dname == "catz" or dname == f"{nb_view.name}.catz":
+            zone = CatalogZone.create(dname, nb_view.name)
+        else:
+            zone = self.getZoneFromNB(dname, nb_view.name)
+        # When zone was not found, let client know
+        if not zone:
+            logger.warning(f"Zone {dname} not found in view {nb_view.name}")
+            self.deny_request(query)
+            return
+
+        # Retrieve the existing SOA record from the Zone
+        soa_rrset = zone.get_rdataset(zone.origin, dns.rdatatype.SOA)
+        if soa_rrset is None:
+            logger.error(f"Zone {dname} has no SOA — aborting")
+            return
+
+        if qtype == dns.rdatatype.SOA:
+            self.handle_soa_request(query, soa_rrset, zone, peer, nb_view, dname)
+        elif qtype == dns.rdatatype.AXFR:
+            self.handle_axfr_request(query, zone, peer, nb_view, dname)
+
+
+class UDPRequestHandler(DNSBaseRequestHandler):
+    def __init__(self, request, client_address, server):
+        super().__init__(request, client_address, server)
+
+    def send_response(self, data):
+        sock = self.request[1]
+        sock.sendto(data, self.client_address)
+
+    def handle(self):
+        data, sock = self.request
+        peer = self.client_address[0]
+        try:
+            self.handle_dns_query(data)
+        except Exception as e:
+            logger.error(f"Error handling request from {peer}: {e}")
+            import traceback
+            traceback.print_exc()
 
 
 class TCPRequestHandler(DNSBaseRequestHandler):
-    def denyRequest(self, query, rcode: dns.rcode = dns.rcode.REFUSED):
-        response = dns.message.make_response(query)
-        response.set_rcode(rcode)
-        wire = response.to_wire(multi=False)
-        length = len(wire).to_bytes(2, byteorder="big")
-        self.request.sendall(length + wire)
+    def __init__(self, request, client_address, server):
+        super().__init__(request, client_address, server)
+
+    def send_response(self, data):
+        length = len(data).to_bytes(2, byteorder="big")
+        self.request.sendall(length + data)
 
     def handle(self):
-        MAX_WIRE = 65535
-        # MAX_WIRE = 2000 # For testing fragmentation
-        RESERVED_TSIG = 300
-        # create a var for setting the client ip in log messages
         peer = self.client_address[0]
-
         try:
             # Receive the entire message....
             sock = self.request  # TCP socket
@@ -444,168 +564,11 @@ class TCPRequestHandler(DNSBaseRequestHandler):
                 if not chunk:
                     return  # connection closed
                 wire += chunk
-
-            # Parse the query
-            query = None
-            try:
-                query = dns.message.from_wire(wire, keyring=self.server.keyring)
-            # If TSIG signature doesnt match our key, refuse query:
-            except dns.tsig.BadSignature as e:
-                logger.warning(
-                    f"Request denied from {peer} failed TSIG verification: {e}"
-                )
-                self.denyRequestBadTSIG(wire, dns.rcode.BADSIG)
-                return
-            # If TSIG Key used is not in our list, refuse query:
-            except dns.message.UnknownTSIGKey as e:
-                logger.warning(f"Request denied from {peer} with bad TSIG key: {e}")
-                self.denyRequestBadTSIG(wire, dns.rcode.BADKEY)
-                return
-
-            # If there was no question in the query, refuse
-            if len(query.question) != 1:
-                self.denyRequest(query)
-                return
-
-            # Get the queried record name and type:
-            qname = query.question[0].name
-            qtype = query.question[0].rdtype
-
-            dname = qname.to_text().rstrip(".")
-
-            # Only process AXFR queries
-            if qtype != dns.rdatatype.AXFR:
-                # if qtype != dns.rdatatype.AXFR or qtype != dns.rdatatype.SOA:
-                logger.warning(
-                    f"Request denied from {peer}: Request was not AXFR (Type: {qtype})"
-                )
-                self.denyRequest(query)
-                return
-
-            # Identify TSIG key used
-            if not query.had_tsig:
-                logger.warning(f"Request denied from {peer}: No TSIG key used")
-                self.denyRequest(query)
-                return
-
-            key_name = query.keyname.canonicalize().to_text()
-
-            # Check if the key matches a view
-            nb_view = self.server.tsig_view_map.get(key_name)
-            if not nb_view:
-                logger.warning(
-                    f"Request denied from {peer}: {key_name} does not match a view"
-                )
-                self.denyRequest(query)
-                return
-
-            # Check if catalog zone
-            if dname == "catz" or dname == f"{nb_view.name}.catz":
-                zone = CatalogZone.create(dname, nb_view.name)
-            else:
-                zone = self.getZoneFromNB(dname, nb_view.name)
-
-            # When zone was not found, let client know
-            if not zone:
-                logger.warning(f"Zone {dname} not found in view {nb_view.name}")
-                self.denyRequest(query)
-                return
-
-            # 1. Prepare SOA + RRsets (identical to your code)
-            soa_rrset = None
-            rrsets = []
-            for name, rdataset in zone.iterate_rdatasets():
-                if not name.is_absolute():
-                    name = name.concatenate(zone.origin)
-                rrset = dns.rrset.from_rdata_list(name, rdataset.ttl, rdataset)
-                if rdataset.rdtype == dns.rdatatype.SOA and soa_rrset is None:
-                    soa_rrset = rrset
-                else:
-                    rrsets.append(rrset)
-
-            if soa_rrset is None:
-                logger.error(f"Zone {dname} has no SOA — aborting AXFR")
-                return
-
-            rrsets.insert(0, soa_rrset)  # Opening SOA
-            rrsets.append(soa_rrset)  # Closing SOA
-
-            # 2. Create a Renderer for the first message
-            r = dns.renderer.Renderer(
-                id=query.id,
-                flags=(dns.flags.QR | dns.flags.AA),
-                max_size=MAX_WIRE,
-                origin=None,
-            )
-            r.add_question(
-                query.question[0].name,
-                query.question[0].rdtype,
-                query.question[0].rdclass,
-            )
-
-            # 3. Loop through RRsets
-            tsig_ctx = None
-            for rrset in rrsets:
-                # logger.debug(f"Iterating over rrset {rrset}. tsig_ctx: {tsig_ctx}")
-                try:
-                    # logger.debug(f"Adding {rrset} to renderer object")
-                    r.add_rrset(dns.renderer.ANSWER, rrset)
-                    if r.max_size - len(r.output.getvalue()) < RESERVED_TSIG:
-                        raise dns.exception.TooBig("TSIG wont fit")
-                except dns.exception.TooBig:
-                    # TSIG chain previous message
-                    r.write_header()
-                    tsig_ctx = r.add_multi_tsig(
-                        ctx=tsig_ctx,
-                        secret=self.server.keyring[query.keyname],
-                        keyname=query.keyname,
-                        fudge=300,
-                        id=query.id,
-                        tsig_error=0,
-                        other_data=b"",
-                        request_mac=r.mac if tsig_ctx else query.mac,
-                    )
-                    wire = r.get_wire()
-                    self.request.sendall(len(wire).to_bytes(2, "big") + wire)
-
-                    # Start new renderer
-                    r = dns.renderer.Renderer(
-                        id=query.id,
-                        flags=(dns.flags.QR | dns.flags.AA),
-                        max_size=MAX_WIRE,
-                        origin=None,
-                    )
-                    r.add_question(
-                        query.question[0].name,
-                        query.question[0].rdtype,
-                        query.question[0].rdclass,
-                    )
-                    r.add_rrset(dns.renderer.ANSWER, rrset)
-
-            # 4. Final message with terminating TSIG
-            r.write_header()
-            # logger.debug(f"Final message. tsig_ctx: {tsig_ctx}")
-            tsig_ctx = r.add_multi_tsig(
-                ctx=tsig_ctx,
-                secret=self.server.keyring[query.keyname],
-                keyname=query.keyname,
-                fudge=300,
-                id=query.id,
-                tsig_error=0,
-                other_data=b"",
-                # request_mac=r.mac if tsig_ctx else None,
-                request_mac=r.mac if tsig_ctx else query.mac,
-            )
-            wire = r.get_wire()
-            self.request.sendall(len(wire).to_bytes(2, "big") + wire)
-
-            # logger.debug(f"Zone transfer request for {nb_view.name}/{dname} from {peer}")
-            logger.debug(f"{peer} AXFR {nb_view.name}/{dname}")
+            self.handle_dns_query(wire)
 
         except Exception as e:
             logger.error(f"Error handling request from {peer}: {e}")
             import traceback
-
             traceback.print_exc()
 
 

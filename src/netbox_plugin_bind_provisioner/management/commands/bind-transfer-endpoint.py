@@ -1,5 +1,6 @@
 import logging
 import socketserver
+import socket
 import os
 import threading
 import dns.query
@@ -61,7 +62,7 @@ class CatalogZone:
             cls._serial_obj = 1
             cls._serial_obj.save()
             logger.debug(
-                f"Catalog zone SOA serial number incremented to {_serial_obj.value}"
+                f"Catalog zone SOA serial number incremented to {cls._serial_obj.value}"
             )
 
     @classmethod
@@ -550,22 +551,33 @@ class TCPRequestHandler(DNSBaseRequestHandler):
 
     def handle(self):
         peer = self.client_address[0]
+        sock = self.request  # TCP socket
+        sock.settimeout(10.0)  # Default 10 second timeout for inactivity
         try:
-            # Receive the entire message....
-            sock = self.request  # TCP socket
-            # Read 2-byte length prefix
-            length_data = sock.recv(2)
-            if len(length_data) < 2:
-                return
-            length = int.from_bytes(length_data, byteorder="big")
-            wire = b""
-            while len(wire) < length:
-                chunk = sock.recv(length - len(wire))
-                if not chunk:
-                    return  # connection closed
-                wire += chunk
-            self.handle_dns_query(wire)
+            while True:
+                # Read 2-byte length prefix
+                length_data = sock.recv(2)
+                if not length_data:
+                    return  # connection closed by peer
+                if len(length_data) < 2:
+                    # Incomplete length data, wait for more or fail
+                    while len(length_data) < 2:
+                        chunk = sock.recv(2 - len(length_data))
+                        if not chunk:
+                            return
+                        length_data += chunk
 
+                length = int.from_bytes(length_data, byteorder="big")
+                wire = b""
+                while len(wire) < length:
+                    chunk = sock.recv(length - len(wire))
+                    if not chunk:
+                        return  # connection closed
+                    wire += chunk
+                self.handle_dns_query(wire)
+
+        except socket.timeout:
+            logger.debug(f"Connection from {peer} timed out")
         except Exception as e:
             logger.error(f"Error handling request from {peer}: {e}")
             import traceback

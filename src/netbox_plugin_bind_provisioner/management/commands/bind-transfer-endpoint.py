@@ -457,9 +457,8 @@ class TCPRequestHandler(DNSBaseRequestHandler):
                 )
                 self.denyRequestBadTSIG(wire, dns.rcode.BADSIG)
                 return
-            # If TSIG Key used is unknown to us or secret does not match
-            # the selected key, refuse query:
-            except (dns.message.UnknownTSIGKey, dns.tsig.BadAlgorithm) as e:
+            # If TSIG Key used is not in our list, refuse query:
+            except dns.message.UnknownTSIGKey as e:
                 logger.warning(f"Request denied from {peer} with bad TSIG key: {e}")
                 self.denyRequestBadTSIG(wire, dns.rcode.BADKEY)
                 return

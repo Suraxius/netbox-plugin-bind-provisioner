@@ -450,16 +450,19 @@ class DNSBaseRequestHandler(socketserver.BaseRequestHandler):
                 continue_on_error=False,
                 ignore_trailing=True
             )
+
         except dns.tsig.BadSignature as e:
             logger.warning(
                 f"Request denied from {peer} failed TSIG verification: {e}"
             )
             self.denyRequestBadTSIG(wire, dns.rcode.BADSIG)
             return
-        except dns.message.UnknownTSIGKey as e:
+
+        except (dns.message.UnknownTSIGKey, dns.tsig.BadAlgorithm) as e:
             logger.warning(f"Request denied from {peer} with bad TSIG key: {e}")
             self.denyRequestBadTSIG(wire, dns.rcode.BADKEY)
             return
+
         except Exception as e:
             logger.error("Error parsing query: ", e)
             return
@@ -584,20 +587,52 @@ class TCPRequestHandler(DNSBaseRequestHandler):
             traceback.print_exc()
 
 
-class TCPDNSServer(socketserver.TCPServer):
+class DNSAddressMixin:
+    def _resolve_address(self, server_address, socktype, proto):
+        host, port = server_address
+
+        infos = socket.getaddrinfo(
+            host,
+            port,
+            socket.AF_UNSPEC,
+            socktype,
+            proto,
+            socket.AI_PASSIVE
+        )
+
+        family, _, _, _, sockaddr = infos[0]
+        self.address_family = family
+        return sockaddr
+
+
+class TCPDNSServer(DNSAddressMixin, socketserver.TCPServer):
     allow_reuse_address = True
 
     def __init__(self, server_address, handler_class, keyring, tsig_view_map):
-        super().__init__(server_address, handler_class)
+        sockaddr = self._resolve_address(
+            server_address,
+            socket.SOCK_STREAM,
+            socket.IPPROTO_TCP
+        )
+
+        super().__init__(sockaddr, handler_class)
+        
         self.keyring = keyring
         self.tsig_view_map = tsig_view_map
 
 
-class UDPDNSServer(socketserver.UDPServer):
+class UDPDNSServer(DNSAddressMixin, socketserver.UDPServer):
     allow_reuse_address = True
 
     def __init__(self, server_address, handler_class, keyring, tsig_view_map):
-        super().__init__(server_address, handler_class)
+        sockaddr = self._resolve_address(
+            server_address,
+            socket.SOCK_DGRAM,
+            socket.IPPROTO_UDP
+        )
+
+        super().__init__(sockaddr, handler_class)
+
         self.keyring = keyring
         self.tsig_view_map = tsig_view_map
 

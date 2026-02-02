@@ -20,7 +20,8 @@ from django.utils import timezone
 from netbox_dns.models import Zone, Record, View
 from netbox_dns.choices import ZoneStatusChoices, RecordStatusChoices
 from datetime import datetime
-from netbox_plugin_bind_provisioner.models import IntegerKeyValueSetting
+from netbox_plugin_bind_provisioner.models import IntegerKeyValueSetting, CatalogZoneMemberIdentifier
+from netbox_plugin_bind_provisioner.utils import generate_catz_member_identifier
 
 logger = logging.getLogger("bind-transfer-endpoint")
 
@@ -31,10 +32,15 @@ class CatalogZone:
     _serial_obj = None
     _previous_last_zone_update = None
 
+    @classmethod
+    def init(cls) -> None:
+        cls._init_serial()
+        cls._generate_member_identifiers()
+
     # Following function loads the last serial from the DB. No return value
     # but it sets the setting "catalog_serial" or terminates the plugin on failure.
     @classmethod
-    def initSerial(cls):
+    def _init_serial(cls) -> None:
         try:
             cls._serial_obj = IntegerKeyValueSetting.objects.get(
                 key="catalog-zone-soa-serial"
@@ -50,8 +56,33 @@ class CatalogZone:
                 f"Catalog zone SOA serial number was not set in the database. Set to {cls._serial_obj.value}"
             )
 
+    # If a zone has no catz identifier yet, create it:
     @classmethod
-    def _incrementSerial(cls):
+    def _generate_member_identifiers(cls) -> None:
+       existing_zone_ids = CatalogZoneMemberIdentifier.objects.values_list(
+           "zone_id", flat=True
+       )
+
+       missing_zones = Zone.objects.exclude(id__in=existing_zone_ids)
+
+       new_objects = [
+           CatalogZoneMemberIdentifier(
+               zone=zone,
+               name=generate_catz_member_identifier(),
+           )
+           for zone in missing_zones
+       ]
+
+       for identifier in new_objects:
+           logger.debug(f"Zone {identifier.zone} has no catz member identifier. Creating...")
+
+       CatalogZoneMemberIdentifier.objects.bulk_create(
+           new_objects,
+           ignore_conflicts=True,
+       )
+
+    @classmethod
+    def _incrementSerial(cls) -> None:
         if 0 < cls._serial_obj.value < cls._serial_max:
             cls._serial_obj.value += 1
             cls._serial_obj.save()
@@ -66,12 +97,9 @@ class CatalogZone:
             )
 
     @classmethod
-    def create(cls, name, view_name):
+    def create(cls, name, view_name) -> dns.zone.Zone:
         # Synchronize following across threads as TCP and UDP listener both use it.
         with cls.lock:
-            # cls = self.__class__
-            # datestamp = datetime.now().strftime("%y%m%d")
-            # latest_zone = Zone.objects.filter().order_by("-last_updated").first()
             latest_zone = (
                 Zone.objects.filter(status=ZoneStatusChoices.STATUS_ACTIVE)
                 .order_by("-last_updated")
@@ -101,7 +129,7 @@ class CatalogZone:
         # get zones from netbox
         nb_zones = Zone.objects.filter(
             view__name=view_name, status=ZoneStatusChoices.STATUS_ACTIVE
-        )
+        ).select_related("catz_identifier")
 
         ptr_base = dns.name.from_text("zones", origin)
 
@@ -110,7 +138,9 @@ class CatalogZone:
             qname = dns.name.from_text(nb_zone.name, dns.name.root)
 
             # Create PTR record
-            p_name = f"zid-{nb_zone.id:09d}"
+            #p_name = f"zid-{nb_zone.id:09d}"
+            p_name = nb_zone.catz_identifier.name
+
             ptr_name = dns.name.from_text(p_name, ptr_base)
             assert ptr_name.is_subdomain(origin)
             rdata = dns.rdata.from_text(
@@ -640,7 +670,7 @@ class UDPDNSServer(DNSAddressMixin, socketserver.UDPServer):
 class Command(BaseCommand):
     help = "Run a minimal AXFR DNS server using NetBox DNS plugin data"
 
-    def loadSettings(self):
+    def load_settings(self):
         self.settings = settings.PLUGINS_CONFIG.get(
             "netbox_plugin_bind_provisioner", None
         )
@@ -654,7 +684,7 @@ class Command(BaseCommand):
             raise RuntimeError("tsig_keys variable not set in plugin settings.")
 
     # Load TSIG keys and map them to views
-    def loadTSIGKeySettings(self):
+    def load_tsig_key_settings(self):
         self.keyring = {}
         self.tsig_view_map = {}
 
@@ -706,11 +736,11 @@ class Command(BaseCommand):
         # Load parameters
         port = options["port"]
         address = options["address"]
-        CatalogZone.initSerial()
+        CatalogZone.init()
 
         # Initialize settings
-        self.loadSettings()
-        self.loadTSIGKeySettings()
+        self.load_settings()
+        self.load_tsig_key_settings()
 
         udp_server = UDPDNSServer(
             (address, port), UDPRequestHandler, self.keyring, self.tsig_view_map
@@ -721,7 +751,7 @@ class Command(BaseCommand):
         )
 
         def run_udp_server(server):
-            logger.debug(f"SOA endpoint listening on {address} udp/{port}")
+            logger.debug(f"Query endpoint listening on {address} udp/{port}")
             server.serve_forever()
 
         udp_thread = threading.Thread(
@@ -730,5 +760,5 @@ class Command(BaseCommand):
 
         udp_thread.start()
 
-        logger.debug(f"AXFR endpoint listening on {address} tcp/{port}")
+        logger.debug(f"Query endpoint listening on {address} tcp/{port}")
         tcp_server.serve_forever()

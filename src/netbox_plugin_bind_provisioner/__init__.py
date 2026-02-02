@@ -32,6 +32,8 @@ class BindProvisionerConfig(PluginConfig):
                 f"{self.name}: Plugin {self.verbose_name} failed to initialize due to missing settings. Terminating Netbox."
             )
 
+        from . import signals
+
 
 config = BindProvisionerConfig
 default_app_config = ".apps.NetboxBindProvisionerConfig"

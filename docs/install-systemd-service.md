@@ -15,7 +15,7 @@
     PIDFile=/var/tmp/netbox.pid
     WorkingDirectory=/opt/netbox
     
-    ExecStart=/opt/netbox/venv/bin/python3  /opt/netbox/netbox/manage.py bind-transfer-endpoint --port 5354
+    ExecStart=/opt/netbox/venv/bin/python3  /opt/netbox/netbox/manage.py dns-transfer-endpoint --port 5354
     
     Restart=on-failure
     RestartSec=30

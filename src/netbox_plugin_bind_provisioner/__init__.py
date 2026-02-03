@@ -1,8 +1,5 @@
 import logging
 from netbox.plugins import PluginConfig
-from django.db import models
-from django.utils.translation import gettext_lazy as _
-from django.dispatch import receiver
 from django.conf import settings
 
 __version__ = "1.0.5"
@@ -32,7 +29,7 @@ class BindProvisionerConfig(PluginConfig):
                 f"{self.name}: Plugin {self.verbose_name} failed to initialize due to missing settings. Terminating Netbox."
             )
 
-        from . import signals
+        from . import signals as signals
 
 
 config = BindProvisionerConfig

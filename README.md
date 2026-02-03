@@ -26,13 +26,13 @@ under the special zone name **"catz"** and addtionally under **"[viewname].catz"
 and may be queried through the built-in DNS server just like any other dns zone.
 
 For proper operation, each view requires an installed TSIG key, and the
-`bind-transfer-endpoint` must be running as a separate background service using
+`dns-transfer-endpoint` must be running as a separate background service using
 the `manage.py` command. Note that DNSSEC support will be added once BIND9
 provides a mechanism to configure it through the Catalog Zones system.
 
 To start the service in the foreground:
 ```
-manage.py bind-transfer-endpoint --port 5354
+manage.py dns-transfer-endpoint --port 5354
 ```
 This process needs to be scheduled as a background service for the built-in DNS
 Server to work correctly. For Linux users with Systemd (Ubuntu, etc), Matt Kollross
@@ -135,10 +135,10 @@ This guide assumes:
     Note that `--port 5354` is optional. The listener will bind this port
     by default.
     ```
-    python3 netbox/manage.py bind-transfer-endpoint --port 5354
+    python3 netbox/manage.py dns-transfer-endpoint --port 5354
     ```
 
-6. Configuring a Bind9 to interact with Netbox via the bind-transfer-endpoint
+6. Configuring a Bind9 to interact with Netbox via the dns-transfer-endpoint
    endpoint. Note that its not possible to give all the correct details of the
    `options` block as it is heavily dependent on the Operating System used.
    Please dont forget to adjust as required.

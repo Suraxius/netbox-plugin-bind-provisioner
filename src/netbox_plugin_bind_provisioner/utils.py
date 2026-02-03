@@ -4,7 +4,6 @@ import dns.rdatatype
 import dns.rdataclass
 import dns.exception
 import netbox_dns.models
-import uuid, base64
 
 def export_bind_zone_file(nb_zone: netbox_dns.models.Zone, file_path: str):
 
@@ -34,6 +33,3 @@ def export_bind_zone_file(nb_zone: netbox_dns.models.Zone, file_path: str):
     except IOError as e:
         raise IOError(f"Failed to write zone file to {file_path}: {e}")
 
-
-def generate_catz_member_identifier():
-    return base64.b32encode(uuid.uuid4().bytes)[0:26].lower().decode('UTF-8')

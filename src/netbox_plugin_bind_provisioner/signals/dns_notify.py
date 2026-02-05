@@ -1,7 +1,7 @@
 from django.db.models.signals import pre_save, post_save
 from django.dispatch import receiver
 from netbox_dns.models import Zone
-from .service.endpoint import catalog_zone_manager as catzm
+from netbox_plugin_bind_provisioner.service.endpoint import catalog_zone_manager as catzm
 
 @receiver(pre_save, sender=Zone)
 def zone_pre_save(sender, instance, **kwargs):
@@ -21,15 +21,18 @@ def zone_pre_save(sender, instance, **kwargs):
     else:
         instance._old_name = None
 
+def notify_masters() -> None:
+    continue
+
 @receiver(post_save, sender=Zone)
-def sync_catalog_zone_identifier(sender, instance, created, **kwargs):
+def notify_masters_post_save(sender, instance, created, **kwargs):
     """
     Ensure CatalogZoneMemberIdentifier exists for each Zone
     and keep its identifier in sync.
     """
     if created:
         # Create the related object on Zone creation
-        catzm.update_member_identifier(instance)
+        notify_masters()
     else:
         old_name = getattr(instance, "_old_name", None)
 
@@ -37,4 +40,4 @@ def sync_catalog_zone_identifier(sender, instance, created, **kwargs):
         if old_name == instance.name:
             return
 
-        catzm.update_member_identifier(instance)
+        notify_masters()

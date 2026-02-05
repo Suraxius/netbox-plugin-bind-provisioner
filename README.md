@@ -107,6 +107,14 @@ This guide assumes:
                     "algorithm": "hmac-sha256",
                     "secret":    "base64-encoded-secret"
                 }
+            },
+            "notify": {
+                "type": "masters", # Notify masters defined in netbox for this zone.
+                "type": "hosts",   # Notify hosts defined in "hosts" below.
+                "protocol": "UDP" or "TCP",
+                "hosts": [
+                    "127.0.0.1:53"
+                ]
             }
         }
     }

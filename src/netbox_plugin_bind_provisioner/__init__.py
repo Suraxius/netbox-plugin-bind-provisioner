@@ -29,7 +29,7 @@ class BindProvisionerConfig(PluginConfig):
                 f"{self.name}: Plugin {self.verbose_name} failed to initialize due to missing settings. Terminating Netbox."
             )
 
-        from . import signals as signals
+        from .signals import catalog_zone, dns_notify # noqa: F401  (register signals)
 
 
 config = BindProvisionerConfig

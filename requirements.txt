@@ -1,2 +1,0 @@
-netbox-plugin-dns>=1.2.0
-dnspython>=2.8.0

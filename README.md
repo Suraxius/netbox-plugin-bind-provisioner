@@ -38,7 +38,6 @@ This process needs to be scheduled as a background service for the built-in DNS
 Server to work correctly. For Linux users with Systemd (Ubuntu, etc), Matt Kollross
 provides a startup unit and instructions [here](docs/install-systemd-service.md).
 
-
 ### Service parameters
 Parameter | Description
 --------- | -------------------------------------------------------------------
@@ -49,6 +48,11 @@ Parameter | Description
 Setting             | Description
 --------------------| ---------------------------------------------------------
 tsig_keys           | Maps a TSIG Key to be used for each view.
+
+## Tested Setup Combinations
+Netbox | Netbox DNS | DNS Provisioner
+------ | ---------- | ---------------
+4.5.0  | 1.5.0      | 1.0.7
 
 ## Installation guide
 This setup provisions a BIND9 server directly with DNS data from NetBox.

@@ -173,14 +173,21 @@ This guide assumes:
         192.168.0.0/16;
     };
 
-    ########## ZONES ##########
-
-    view "public" {
+    ######## TSIG Keys ########
         key "public_view_key" {
             algorithm hmac-sha256;
             secret "base64-encoded-secret";
         };
 
+        key "private_view_key" {
+            algorithm hmac-sha256;
+            secret "base64-encoded-secret";
+        };
+    ###########################
+
+
+    ########## ZONES ##########
+    view "public" {
         match-clients { public; };
 
         catalog-zones {
@@ -199,11 +206,6 @@ This guide assumes:
     };
 
     view "private" {
-        key "private_view_key" {
-            algorithm hmac-sha256;
-            secret "base64-encoded-secret";
-        };
-
         match-clients { private; };
 
         catalog-zones {

@@ -3,9 +3,9 @@ requires = ["setuptools>=61", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "netbox-plugin-bind-provisioner"
+name = "netbox-plugin-dns-bridge"
 dynamic = ["version"]
-description = "A Bind provisioning plugin that uses netbox_dns for its data source"
+description = "A bridge between netbox-plugin-dns and your DNS infrastructure."
 authors = [
     { name = "Sven Luethi" },
 ]
@@ -20,13 +20,13 @@ dependencies = [
 [tool.setuptools]
 include-package-data = true
 zip-safe = false
-package-dir = { "" = "src" }
+package-dir = { "" = "netbox_dns_bridge" }
 
 [tool.setuptools.packages.find]
-where = ["src"]
+where = ["netbox_dns_bridge"]
 
 [tool.setuptools.dynamic]
-version = { attr = "netbox_plugin_bind_provisioner.__version__" }
+version = { attr = "netbox_dns_bridge.__version__" }
 
 [project.urls]
 Homepage = "https://github.com/Suraxius/netbox-plugin-bind-provisioner"

@@ -1,42 +1,44 @@
-# Netbox Bind Provisioner
-The Netbox Bind Provisioner plugin implements a lightweight DNS server inside
-Netbox and builds a bridge for BIND and other DNS Servers implementing RFC9432
-to retrieve DNS Zones directly from Netbox using DNS native mechanisms.
+# Netbox DNS Bridge (Formerly Netbox Bind Provisioner)
+The Netbox DNS Bridge plugin implements a lightweight DNS server inside Netbox and builds a bridge
+for BIND and other DNS Servers implementing RFC9432 to retrieve DNS Zones directly from Netbox
+using DNS native mechanisms.
 
-[![PyPi](https://img.shields.io/pypi/v/netbox-plugin-bind-provisioner)](https://pypi.org/project/netbox-plugin-bind-provisioner/)
-[![Stars Badge](https://img.shields.io/github/stars/suraxius/netbox-plugin-bind-provisioner?style=flat)](https://github.com/suraxius/netbox-plugin-bind-provisioner/stargazers)
-[![Forks Badge](https://img.shields.io/github/forks/suraxius/netbox-plugin-bind-provisioner?style=flat)](https://github.com/suraxius/netbox-plugin-bind-provisioner/network/members)
-[![Issues Badge](https://img.shields.io/github/issues/suraxius/netbox-plugin-bind-provisioner)](https://github.com/suraxius/netbox-plugin-bind-provisioner/issues)
-[![Pull Requests Badge](https://img.shields.io/github/issues-pr/suraxius/netbox-plugin-bind-provisioner)](https://github.com/suraxius/netbox-plugin-bind-provisioner/pulls)
-[![GitHub contributors](https://img.shields.io/github/contributors/suraxius/netbox-plugin-bind-provisioner?color=2b9348)](https://github.com/suraxius/netbox-plugin-bind-provisioner/graphs/contributors)
-[![License Badge](https://img.shields.io/github/license/suraxius/netbox-plugin-bind-provisioner?color=2b9348)](https://github.com/suraxius/netbox-plugin-bind-provisioner/blob/master/LICENSE)
-[![Code Style Black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
-[![Downloads](https://static.pepy.tech/personalized-badge/netbox-plugin-bind-provisioner?period=total&left_color=BLACK&right_color=BLUE&left_text=Downloads)](https://pepy.tech/project/netbox-plugin-bind-provisioner)
-[![Downloads/Week](https://static.pepy.tech/personalized-badge/netbox-plugin-bind-provisioner?period=monthly&left_color=BLACK&right_color=BLUE&left_text=Downloads%2fMonth)](https://pepy.tech/project/netbox-plugin-bind-provisioner)
-[![Downloads/Month](https://static.pepy.tech/personalized-badge/netbox-plugin-bind-provisioner?period=weekly&left_color=BLACK&right_color=BLUE&left_text=Downloads%2fWeek)](https://pepy.tech/project/netbox-plugin-bind-provisioner)
+<a href="https://pypi.org/project/netbox-plugin-bind-provisioner/"><img src="https://img.shields.io/pypi/v/netbox-plugin-bind-provisioner" alt="PyPi"></a>
+<a href="https://github.com/suraxius/netbox-plugin-bind-provisioner/stargazers"><img src="https://img.shields.io/github/stars/suraxius/netbox-plugin-bind-provisioner?style=flat" alt="Stars Badge"></a>
+<a href="https://github.com/suraxius/netbox-plugin-bind-provisioner/network/members"><img src="https://img.shields.io/github/forks/suraxius/netbox-plugin-bind-provisioner?style=flat" alt="Forks Badge"></a>
+<a href="https://github.com/suraxius/netbox-plugin-bind-provisioner/issues"><img src="https://img.shields.io/github/issues/suraxius/netbox-plugin-bind-provisioner" alt="Issues Badge"></a>
+<a href="https://github.com/suraxius/netbox-plugin-bind-provisioner/pulls"><img src="https://img.shields.io/github/issues-pr/suraxius/netbox-plugin-bind-provisioner" alt="Pull Requests Badge"></a>
+<a href="https://github.com/suraxius/netbox-plugin-bind-provisioner/graphs/contributors"><img src="https://img.shields.io/github/contributors/suraxius/netbox-plugin-bind-provisioner?color=2b9348" alt="GitHub contributors"></a>
+<a href="https://github.com/suraxius/netbox-plugin-bind-provisioner/blob/master/LICENSE"><img src="https://img.shields.io/github/license/suraxius/netbox-plugin-bind-provisioner?color=2b9348" alt="License Badge"></a>
+<a href="https://github.com/psf/black"><img src="https://img.shields.io/badge/code%20style-black-000000.svg" alt="Code Style Black"></a>
+<a href="https://pepy.tech/project/netbox-plugin-bind-provisioner"><img src="https://static.pepy.tech/personalized-badge/netbox-plugin-bind-provisioner?period=total&left_color=BLACK&right_color=BLUE&left_text=Downloads" alt="Downloads"></a>
+<a href="https://pepy.tech/project/netbox-plugin-bind-provisioner"><img src="https://static.pepy.tech/personalized-badge/netbox-plugin-bind-provisioner?period=monthly&left_color=BLACK&right_color=BLUE&left_text=Downloads%2fMonth" alt="Downloads/Week"></a>
+<a href="https://pepy.tech/project/netbox-plugin-bind-provisioner"><img src="https://static.pepy.tech/personalized-badge/netbox-plugin-bind-provisioner?period=weekly&left_color=BLACK&right_color=BLUE&left_text=Downloads%2fWeek" alt="Downloads/Month"></a>
+
+
+
+![Architecture Overview](docs/architecture-overview.svg)
 
 ## Plugin configuration
-While providing Zone transfers via AXFR, the Server also exposes specialized
-catalog zones that BIND and other RFC9432 compliant DNS Servers use to
-automatically discover newly created zones and remove deleted ones. The plugin
-supports views and basic DNS security via TSIG.
+While providing Zone transfers via AXFR, the Server also exposes specialized catalog zones that BIND
+and other RFC9432 compliant DNS Servers use to automatically discover newly created zones and remove
+deleted ones. The plugin supports views and basic DNS security via TSIG.
 
-The plugin exposes one catalog zone per view. Each catalog zone is made available
-under the special zone name **"catz"** and addtionally under **"[viewname].catz"**
-and may be queried through the built-in DNS server just like any other dns zone.
+The plugin exposes one catalog zone per view. Each catalog zone is made available under the special
+zone name **"catz"** and addtionally under **"[viewname].catz"** and may be queried through the
+built-in DNS server just like any other dns zone.
 
-For proper operation, each view requires an installed TSIG key, and the
-`dns-transfer-endpoint` must be running as a separate background service using
-the `manage.py` command. Note that DNSSEC support will be added once BIND9
-provides a mechanism to configure it through the Catalog Zones system.
+For proper operation, each view requires an installed TSIG key, and the `dns-transfer-endpoint` must
+be running as a separate background service using the `manage.py` command. Note that DNSSEC support
+will be added once BIND9 provides a mechanism to configure it through the Catalog Zones system.
 
 To start the service in the foreground:
 ```
 manage.py dns-transfer-endpoint --port 5354
 ```
-This process needs to be scheduled as a background service for the built-in DNS
-Server to work correctly. For Linux users with Systemd (Ubuntu, etc), Matt Kollross
-provides a startup unit and instructions [here](docs/install-systemd-service.md).
+This process needs to be scheduled as a background service for the built-in DNS Server to work
+correctly. For Linux users with Systemd (Ubuntu, etc), Matt Kollross provides a startup unit and
+instructions [here](docs/install-systemd-service.md).
 
 ### Service parameters
 Parameter | Description
@@ -55,10 +57,9 @@ Netbox | Netbox DNS | DNS Provisioner
 4.5.0  | 1.5.0      | 1.0.7
 
 ## Installation guide
-This setup provisions a BIND9 server directly with DNS data from NetBox.
-BIND9 can optionally run on a separate server. If so, any reference to
-127.0.0.1 in step 6 must be replaced with the IP address of the NetBox host.
-TCP and UDP traffic from the BIND9 server to the NetBox host must be allowed on
+This setup provisions a BIND9 server directly with DNS data from NetBox. BIND9 can optionally run on
+a separate server. If so, any reference to 127.0.0.1 in step 6 must be replaced with the IP address
+of the NetBox host. TCP and UDP traffic from the BIND9 server to the NetBox host must be allowed on
 port 5354 (or the port you have configured).
 
 This guide assumes:
@@ -88,10 +89,10 @@ This guide assumes:
     ```
     to
     ```
-    PLUGINS = ['netbox_dns', 'netbox_plugin_bind_provisioner']
+    PLUGINS = ['netbox_dns', 'netbox_dns_bridge']
     ```
 
-    Configure the Bind Exporter Plugin using the PLUGINS_CONFIG dictionary.
+    Configure the DNS Bridge Plugin using the PLUGINS_CONFIG dictionary.
     Change
     ```
     PLUGINS_CONFIG = {}
@@ -99,7 +100,7 @@ This guide assumes:
     to
     ```
     PLUGINS_CONFIG = {
-        "netbox_plugin_bind_provisioner": {
+        "netbox_dns_bridge": {
             "tsig_keys": {
                 "public": {
                     "keyname":   "public_view_key",
@@ -118,7 +119,7 @@ This guide assumes:
     Note that the tsig-key attributes keyname, algorithm and secret form a
     dictionary in following python structure path:
     ```
-    PLUGINS_CONFIG.netbox_plugin_bind_provisioner.tsig_keys.<dns_view_name>
+    PLUGINS_CONFIG.netbox_dns_bridge.tsig_keys.<dns_view_name>
     ```
     This allows the plugin to map requests to the right dns view using the tsig
     signature from each request.
@@ -130,22 +131,19 @@ This guide assumes:
 
 5. Start listener
 
-    This step runs the DNS endpoint used by bind to configure itself. You may want
-    to write a service wrapper that runs this in the background.
-    A guide for setting up a systemd service on Ubuntu is provided by Matt
-    Kollross [here](docs/install-systemd-service.md). Dont forget to activate
-    the venv if you do decide to run this service in the background.
+    This step runs the DNS endpoint used by bind to configure itself. You may want to write a
+    service wrapper that runs this in the background. A guide for setting up a systemd service on
+    Ubuntu is provided by Matt Kollross [here](docs/install-systemd-service.md). Dont forget to
+    activate the venv if you do decide to run this service in the background.
 
-    Note that `--port 5354` is optional. The listener will bind this port
-    by default.
+    Note that `--port 5354` is optional. The listener will bind this port by default.
     ```
     python3 netbox/manage.py dns-transfer-endpoint --port 5354
     ```
 
-6. Configuring a Bind9 to interact with Netbox via the dns-transfer-endpoint
-   endpoint. Note that its not possible to give all the correct details of the
-   `options` block as it is heavily dependent on the Operating System used.
-   Please dont forget to adjust as required.
+6. Configuring a Bind9 to interact with Netbox via the dns-transfer-endpoint endpoint. Note that its
+    not possible to give all the correct details of the `options` block as it is heavily dependent
+    on the Operating System used. Please dont forget to adjust as required.
    
     ```
     ########## OPTIONS ##########

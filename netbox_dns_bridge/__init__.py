@@ -2,7 +2,7 @@ import logging
 from netbox.plugins import PluginConfig
 from django.conf import settings
 
-__version__ = "1.0.7"
+__version__ = "1.0.8"
 
 logger = logging.getLogger(__name__)
 
@@ -13,14 +13,14 @@ logging.basicConfig(
 )
 
 
-class BindProvisionerConfig(PluginConfig):
-    name = "netbox_plugin_bind_provisioner"
-    verbose_name = "Netbox Bind Provisioner"
-    description = "Provisions Zones to a Bind Server configured as hidden master"
+class DNSBridgeConfig(PluginConfig):
+    name = "netbox_dns_bridge"
+    verbose_name = "Netbox DNS Bridge"
+    description = ""
     version = __version__
     author = "Sven Luethi"
-    author_email = "sven.luethi@everyware.ch"
-    base_url = "bind_provisioner"
+    author_email = "dev@sven.luethi.co"
+    base_url = "dns-bridge"
 
     def ready(self):
         self.settings = settings.PLUGINS_CONFIG.get(self.name, None)
@@ -32,5 +32,5 @@ class BindProvisionerConfig(PluginConfig):
         from . import signals as signals
 
 
-config = BindProvisionerConfig
-default_app_config = ".apps.NetboxBindProvisionerConfig"
+config = DNSBridgeConfig
+default_app_config = ".apps.NetboxDNSBridgeConfig"

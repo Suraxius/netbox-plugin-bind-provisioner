@@ -12,7 +12,7 @@ import dns.exception
 import dns.renderer
 from netbox_dns.models import Zone
 from netbox_dns.choices import ZoneStatusChoices
-from netbox_plugin_bind_provisioner.models import IntegerKeyValueSetting, CatalogZoneMemberIdentifier
+from netbox_dns_bridge.models import IntegerKeyValueSetting, CatalogZoneMemberIdentifier
 from uuid import uuid4
 from base64 import b32encode
 

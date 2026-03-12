@@ -14,9 +14,9 @@ import dns.renderer
 from django.core.management.base import BaseCommand
 from django.conf import settings
 from netbox_dns.models import View
-from netbox_plugin_bind_provisioner.service.endpoint.request_handler import UDPRequestHandler, TCPRequestHandler
-from netbox_plugin_bind_provisioner.service.endpoint.dns_server import UDPDNSServer, TCPDNSServer
-from netbox_plugin_bind_provisioner.service.endpoint import catalog_zone_manager as catzm
+from netbox_dns_bridge.service.endpoint.request_handler import UDPRequestHandler, TCPRequestHandler
+from netbox_dns_bridge.service.endpoint.dns_server import UDPDNSServer, TCPDNSServer
+from netbox_dns_bridge.service.endpoint import catalog_zone_manager as catzm
 
 logger = logging.getLogger("dns-transfer-endpoint")
 
@@ -25,7 +25,7 @@ class Command(BaseCommand):
 
     def load_settings(self):
         self.settings = settings.PLUGINS_CONFIG.get(
-            "netbox_plugin_bind_provisioner", None
+            "netbox_dns_bridge", None
         )
         if not self.settings:
             raise RuntimeError(

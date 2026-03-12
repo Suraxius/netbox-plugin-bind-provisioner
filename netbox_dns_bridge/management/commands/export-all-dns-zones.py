@@ -4,7 +4,7 @@ import dns.rdatatype
 import dns.rdataclass
 import dns.exception
 import netbox_dns.models
-from netbox_plugin_bind_provisioner.utils import export_bind_zone_file
+from netbox_dns_bridge.utils import export_bind_zone_file
 from django.core.management.base import BaseCommand, CommandError
 
 class Command(BaseCommand):

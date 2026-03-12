@@ -15,6 +15,10 @@ using DNS native mechanisms.
 <a href="https://pepy.tech/project/netbox-plugin-bind-provisioner"><img src="https://static.pepy.tech/personalized-badge/netbox-plugin-bind-provisioner?period=monthly&left_color=BLACK&right_color=BLUE&left_text=Downloads%2fMonth" alt="Downloads/Week"></a>
 <a href="https://pepy.tech/project/netbox-plugin-bind-provisioner"><img src="https://static.pepy.tech/personalized-badge/netbox-plugin-bind-provisioner?period=weekly&left_color=BLACK&right_color=BLUE&left_text=Downloads%2fWeek" alt="Downloads/Month"></a>
 
+
+
+![Architecture Overview](docs/architecture-overview.svg)
+
 ## Plugin configuration
 While providing Zone transfers via AXFR, the Server also exposes specialized catalog zones that BIND
 and other RFC9432 compliant DNS Servers use to automatically discover newly created zones and remove

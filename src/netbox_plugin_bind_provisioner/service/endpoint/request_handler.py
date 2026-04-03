@@ -131,7 +131,7 @@ class DNSBaseRequestHandler(socketserver.BaseRequestHandler):
                 keyname=query.keyname,
                 tsig_error=tsig_error,
             )
-        self.denyRequest(query)
+        self._deny_request(query)
 
     def _send_response(self, data) -> None:
         raise NotImplementedError

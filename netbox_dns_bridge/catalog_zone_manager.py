@@ -16,7 +16,7 @@ from netbox_dns_bridge.models import IntegerKeyValueSetting, CatalogZoneMemberId
 from uuid import uuid4
 from base64 import b32encode
 
-logger = logging.getLogger("dns-transfer-endpoint")
+logger = logging.getLogger(__name__)
 
 _LOCK = threading.Lock()
 _SERIAL_MAX = 0xFFFFFFFF
@@ -47,18 +47,22 @@ def _init_serial() -> None:
             f"Catalog zone SOA serial number was not set in the database. Set to {_SERIAL_OBJ.value}"
         )
 
-def _increment_serial() -> None:
+def _set_serial(new_serial: int) -> bool:
     global _SERIAL_OBJ
 
-    if 0 < _SERIAL_OBJ.value < _SERIAL_MAX:
-        _SERIAL_OBJ.value += 1
+    if (0 < new_serial < _SERIAL_MAX):
+        _SERIAL_OBJ.value = new_serial
         _SERIAL_OBJ.save()
+        return True
     else:
+        return False
+        
+def _increment_serial() -> None:
+    if not _set_serial( _SERIAL_OBJ.value + 1 ):
         logger.warning(
             f"Failed to incremenet catalog serial {_SERIAL_OBJ.value}. Will overflow serial back to 1"
         )
-        _SERIAL_OBJ.value = 1
-        _SERIAL_OBJ.save()
+        _set_serial(1)
         logger.debug(
             f"Catalog zone SOA serial number incremented to {_SERIAL_OBJ.value}"
         )

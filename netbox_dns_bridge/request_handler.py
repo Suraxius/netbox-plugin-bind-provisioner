@@ -13,9 +13,9 @@ import dns.exception
 import dns.renderer
 from netbox_dns.models import Zone, Record
 from netbox_dns.choices import ZoneStatusChoices, RecordStatusChoices
-from . import catalog_zone_manager as catzm
+from netbox_dns_bridge import catalog_zone_manager as catzm
 
-logger = logging.getLogger("dns-transfer-endpoint")
+logger = logging.getLogger(__name__)
 
 
 class DNSBaseRequestHandler(socketserver.BaseRequestHandler):
@@ -131,7 +131,7 @@ class DNSBaseRequestHandler(socketserver.BaseRequestHandler):
                 keyname=query.keyname,
                 tsig_error=tsig_error,
             )
-        self.denyRequest(query)
+        self._denyRequest(query)
 
     def _send_response(self, data) -> None:
         raise NotImplementedError

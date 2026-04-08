@@ -2,7 +2,7 @@ import logging
 import socketserver
 import socket
 
-logger = logging.getLogger("dns-transfer-endpoint")
+logger = logging.getLogger(__name__)
 
 class DNSAddressMixin:
     def _resolve_address(self, server_address, socktype, proto):

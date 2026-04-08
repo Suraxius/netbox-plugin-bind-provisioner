@@ -20,10 +20,10 @@ dependencies = [
 [tool.setuptools]
 include-package-data = true
 zip-safe = false
-package-dir = { "" = "netbox_dns_bridge" }
+package-dir = { "" = "." }
 
 [tool.setuptools.packages.find]
-where = ["netbox_dns_bridge"]
+where = ["."]
 
 [tool.setuptools.dynamic]
 version = { attr = "netbox_dns_bridge.__version__" }

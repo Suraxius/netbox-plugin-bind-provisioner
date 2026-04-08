@@ -14,11 +14,12 @@ import dns.renderer
 from django.core.management.base import BaseCommand
 from django.conf import settings
 from netbox_dns.models import View
-from netbox_dns_bridge.service.endpoint.request_handler import UDPRequestHandler, TCPRequestHandler
-from netbox_dns_bridge.service.endpoint.dns_server import UDPDNSServer, TCPDNSServer
-from netbox_dns_bridge.service.endpoint import catalog_zone_manager as catzm
+from netbox_dns_bridge.request_handler import UDPRequestHandler, TCPRequestHandler
+from netbox_dns_bridge.dns_server import UDPDNSServer, TCPDNSServer
+from netbox_dns_bridge import catalog_zone_manager as catzm
+from netbox_dns_bridge.models import IntegerKeyValueSetting
 
-logger = logging.getLogger("dns-transfer-endpoint")
+logger = logging.getLogger(__name__)
 
 class Command(BaseCommand):
     help = "Run a minimal AXFR DNS server using data from NetBox DNS plugin"

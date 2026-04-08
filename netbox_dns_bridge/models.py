@@ -2,6 +2,7 @@ from django.db import models
 import netbox.models
 import netbox_dns.models
 
+
 class IntegerKeyValueSetting(models.Model):
     key = models.CharField(max_length=64)
     value = models.IntegerField()
@@ -11,6 +12,7 @@ class IntegerKeyValueSetting(models.Model):
 
     class Meta:
         default_permissions = ()
+
 
 class CatalogZoneMemberIdentifier(models.Model):
     name = models.CharField(

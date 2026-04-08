@@ -114,7 +114,7 @@ class DNSBaseRequestHandler(socketserver.BaseRequestHandler):
                 zone.replace_rdataset(name, rdataset)
         return zone
 
-    def _denyRequestBadTSIG(self, wire, tsig_error: dns.rcode) -> None:
+    def _deny_request_bad_tsig(self, wire, tsig_error: dns.rcode) -> None:
         # Use empty keyring to parse TSIG without validating
         query = dns.message.from_wire(
             wire, keyring={}, ignore_trailing=True, continue_on_error=True
@@ -131,7 +131,7 @@ class DNSBaseRequestHandler(socketserver.BaseRequestHandler):
                 keyname=query.keyname,
                 tsig_error=tsig_error,
             )
-        self._denyRequest(query)
+        self._deny_request(query)
 
     def _send_response(self, data) -> None:
         raise NotImplementedError
@@ -273,19 +273,17 @@ class DNSBaseRequestHandler(socketserver.BaseRequestHandler):
                 wire,
                 keyring=self.server.keyring,
                 continue_on_error=False,
-                ignore_trailing=True
+                ignore_trailing=True,
             )
 
         except dns.tsig.BadSignature as e:
-            logger.warning(
-                f"Request denied from {peer} failed TSIG verification: {e}"
-            )
-            self._denyRequestBadTSIG(wire, dns.rcode.BADSIG)
+            logger.warning(f"Request denied from {peer} failed TSIG verification: {e}")
+            self._deny_request_bad_tsig(wire, dns.rcode.BADSIG)
             return
 
         except (dns.message.UnknownTSIGKey, dns.tsig.BadAlgorithm) as e:
             logger.warning(f"Request denied from {peer} with bad TSIG key: {e}")
-            self._denyRequestBadTSIG(wire, dns.rcode.BADKEY)
+            self._deny_request_bad_tsig(wire, dns.rcode.BADKEY)
             return
 
         except Exception as e:
@@ -366,6 +364,7 @@ class UDPRequestHandler(DNSBaseRequestHandler):
         except Exception as e:
             logger.error(f"Error handling request from {peer}: {e}")
             import traceback
+
             traceback.print_exc()
 
 
@@ -409,5 +408,5 @@ class TCPRequestHandler(DNSBaseRequestHandler):
         except Exception as e:
             logger.error(f"Error handling request from {peer}: {e}")
             import traceback
-            traceback.print_exc()
 
+            traceback.print_exc()

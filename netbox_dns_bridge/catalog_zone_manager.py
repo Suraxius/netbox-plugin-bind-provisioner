@@ -23,9 +23,11 @@ _SERIAL_MAX = 0xFFFFFFFF
 _SERIAL_OBJ = None
 _PREVIOUS_LAST_ZONE_UPDATE = None
 
+
 def init() -> None:
     _init_serial()
     _create_missing_member_identifiers()
+
 
 # Following function loads the last serial from the DB. No return value
 # but it sets the setting "catalog_serial" or terminates the plugin on failure.
@@ -33,9 +35,7 @@ def _init_serial() -> None:
     global _SERIAL_OBJ
 
     try:
-        _SERIAL_OBJ = IntegerKeyValueSetting.objects.get(
-            key="catalog-zone-soa-serial"
-        )
+        _SERIAL_OBJ = IntegerKeyValueSetting.objects.get(key="catalog-zone-soa-serial")
         logger.debug(
             f"Catalog zone SOA serial number {_SERIAL_OBJ.value} loaded from database"
         )
@@ -47,18 +47,20 @@ def _init_serial() -> None:
             f"Catalog zone SOA serial number was not set in the database. Set to {_SERIAL_OBJ.value}"
         )
 
+
 def _set_serial(new_serial: int) -> bool:
     global _SERIAL_OBJ
 
-    if (0 < new_serial < _SERIAL_MAX):
+    if 0 < new_serial < _SERIAL_MAX:
         _SERIAL_OBJ.value = new_serial
         _SERIAL_OBJ.save()
         return True
     else:
         return False
-        
+
+
 def _increment_serial() -> None:
-    if not _set_serial( _SERIAL_OBJ.value + 1 ):
+    if not _set_serial(_SERIAL_OBJ.value + 1):
         logger.warning(
             f"Failed to incremenet catalog serial {_SERIAL_OBJ.value}. Will overflow serial back to 1"
         )
@@ -67,29 +69,32 @@ def _increment_serial() -> None:
             f"Catalog zone SOA serial number incremented to {_SERIAL_OBJ.value}"
         )
 
+
 # If a zone has no catz identifier yet, create it:
 def _create_missing_member_identifiers() -> None:
-   existing_zone_ids = CatalogZoneMemberIdentifier.objects.values_list(
-       "zone_id", flat=True
-   )
+    existing_zone_ids = CatalogZoneMemberIdentifier.objects.values_list(
+        "zone_id", flat=True
+    )
 
-   missing_zones = Zone.objects.exclude(id__in=existing_zone_ids)
+    missing_zones = Zone.objects.exclude(id__in=existing_zone_ids)
 
-   new_objects = [
-       CatalogZoneMemberIdentifier(
-           zone=zone,
-           name=_generate_member_identifier(),
-       )
-       for zone in missing_zones
-   ]
+    new_objects = [
+        CatalogZoneMemberIdentifier(
+            zone=zone,
+            name=_generate_member_identifier(),
+        )
+        for zone in missing_zones
+    ]
 
-   for identifier in new_objects:
-       logger.debug(f"Zone {identifier.zone} has no catz member identifier. Creating...")
+    for identifier in new_objects:
+        logger.debug(
+            f"Zone {identifier.zone} has no catz member identifier. Creating..."
+        )
 
-   CatalogZoneMemberIdentifier.objects.bulk_create(
-       new_objects,
-       ignore_conflicts=False,
-   )
+    CatalogZoneMemberIdentifier.objects.bulk_create(
+        new_objects,
+        ignore_conflicts=False,
+    )
 
 
 def create_zone(name, view_name) -> dns.zone.Zone:
@@ -134,14 +139,14 @@ def create_zone(name, view_name) -> dns.zone.Zone:
         qname = dns.name.from_text(nb_zone.name, dns.name.root)
 
         # Create PTR record
-        #p_name = f"zid-{nb_zone.id:09d}"
+        # p_name = f"zid-{nb_zone.id:09d}"
         p_name = nb_zone.catz_identifier.name
 
         ptr_name = dns.name.from_text(p_name, ptr_base)
         if not ptr_name.is_subdomain(origin):
             raise ValueError(
                 "Catalog zone member identifier {ptr_name.to_text()} not a subdomain"
-                )
+            )
         rdata = dns.rdata.from_text(
             dns.rdataclass.IN, dns.rdatatype.PTR, qname.to_text()
         )
@@ -196,9 +201,7 @@ def create_zone(name, view_name) -> dns.zone.Zone:
 
     # NS record for catz.
     ns_name = dns.name.from_text("invalid", dns.name.root)
-    ns_rdata = dns.rdata.from_text(
-        dns.rdataclass.IN, dns.rdatatype.NS, str(ns_name)
-    )
+    ns_rdata = dns.rdata.from_text(dns.rdataclass.IN, dns.rdatatype.NS, str(ns_name))
     ns_rdataset = dns.rdataset.Rdataset(dns.rdataclass.IN, dns.rdatatype.NS)
     ns_rdataset.add(ns_rdata, 0)
 
@@ -207,9 +210,7 @@ def create_zone(name, view_name) -> dns.zone.Zone:
     ns_node.rdatasets.append(ns_rdataset)
 
     # TXT record for version.catz.
-    version_name = dns.name.from_text(
-        "version", origin
-    )  # relative to origin "catz."
+    version_name = dns.name.from_text("version", origin)  # relative to origin "catz."
     txt_rdata = dns.rdata.from_text(dns.rdataclass.IN, dns.rdatatype.TXT, '"2"')
 
     txt_rdataset = dns.rdataset.Rdataset(dns.rdataclass.IN, dns.rdatatype.TXT)
@@ -221,8 +222,10 @@ def create_zone(name, view_name) -> dns.zone.Zone:
 
     return zone
 
+
 def _generate_member_identifier() -> None:
-    return b32encode(uuid4().bytes)[0:26].lower().decode('UTF-8')
+    return b32encode(uuid4().bytes)[0:26].lower().decode("UTF-8")
+
 
 def update_member_identifier(zone: Zone) -> None:
     CatalogZoneMemberIdentifier.objects.update_or_create(

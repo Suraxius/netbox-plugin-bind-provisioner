@@ -9,30 +9,50 @@ class Migration(migrations.Migration):
     initial = True
 
     dependencies = [
-        ('netbox_dns', '0030_dnsseckeytemplate_comments_dnsseckeytemplate_owner_and_more'),
+        (
+            "netbox_dns",
+            "0030_dnsseckeytemplate_comments_dnsseckeytemplate_owner_and_more",
+        ),
     ]
 
     operations = [
         migrations.CreateModel(
-            name='IntegerKeyValueSetting',
+            name="IntegerKeyValueSetting",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False)),
-                ('key', models.CharField(max_length=64)),
-                ('value', models.IntegerField()),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True, primary_key=True, serialize=False
+                    ),
+                ),
+                ("key", models.CharField(max_length=64)),
+                ("value", models.IntegerField()),
             ],
             options={
-                'default_permissions': (),
+                "default_permissions": (),
             },
         ),
         migrations.CreateModel(
-            name='CatalogZoneMemberIdentifier',
+            name="CatalogZoneMemberIdentifier",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False)),
-                ('name', models.CharField(max_length=26, unique=True)),
-                ('zone', models.OneToOneField(on_delete=django.db.models.deletion.CASCADE, related_name='catz_identifier', to='netbox_dns.zone')),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True, primary_key=True, serialize=False
+                    ),
+                ),
+                ("name", models.CharField(max_length=26, unique=True)),
+                (
+                    "zone",
+                    models.OneToOneField(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="catz_identifier",
+                        to="netbox_dns.zone",
+                    ),
+                ),
             ],
             options={
-                'ordering': ('name',),
+                "ordering": ("name",),
             },
         ),
     ]

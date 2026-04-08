@@ -4,17 +4,13 @@ import socket
 
 logger = logging.getLogger(__name__)
 
+
 class DNSAddressMixin:
     def _resolve_address(self, server_address, socktype, proto):
         host, port = server_address
 
         infos = socket.getaddrinfo(
-            host,
-            port,
-            socket.AF_UNSPEC,
-            socktype,
-            proto,
-            socket.AI_PASSIVE
+            host, port, socket.AF_UNSPEC, socktype, proto, socket.AI_PASSIVE
         )
 
         family, _, _, _, sockaddr = infos[0]
@@ -27,9 +23,7 @@ class TCPDNSServer(DNSAddressMixin, socketserver.TCPServer):
 
     def __init__(self, server_address, handler_class, keyring, tsig_view_map):
         sockaddr = self._resolve_address(
-            server_address,
-            socket.SOCK_STREAM,
-            socket.IPPROTO_TCP
+            server_address, socket.SOCK_STREAM, socket.IPPROTO_TCP
         )
 
         super().__init__(sockaddr, handler_class)
@@ -43,9 +37,7 @@ class UDPDNSServer(DNSAddressMixin, socketserver.UDPServer):
 
     def __init__(self, server_address, handler_class, keyring, tsig_view_map):
         sockaddr = self._resolve_address(
-            server_address,
-            socket.SOCK_DGRAM,
-            socket.IPPROTO_UDP
+            server_address, socket.SOCK_DGRAM, socket.IPPROTO_UDP
         )
 
         super().__init__(sockaddr, handler_class)

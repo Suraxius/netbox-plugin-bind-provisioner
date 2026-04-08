@@ -5,6 +5,7 @@ import dns.rdataclass
 import dns.exception
 import netbox_dns.models
 
+
 def export_bind_zone_file(nb_zone: netbox_dns.models.Zone, file_path: str):
 
     # Create dnspython zone object
@@ -32,4 +33,3 @@ def export_bind_zone_file(nb_zone: netbox_dns.models.Zone, file_path: str):
             dp_zone.to_file(f, sorted=True)
     except IOError as e:
         raise IOError(f"Failed to write zone file to {file_path}: {e}")
-

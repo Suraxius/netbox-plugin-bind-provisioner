@@ -3,6 +3,7 @@ from django.dispatch import receiver
 from netbox_dns.models import Zone
 from .service.endpoint import catalog_zone_manager as catzm
 
+
 @receiver(pre_save, sender=Zone)
 def zone_pre_save(sender, instance, **kwargs):
     """
@@ -10,16 +11,12 @@ def zone_pre_save(sender, instance, **kwargs):
     """
     if instance.pk:
         try:
-            instance._old_name = (
-                sender.objects
-                .only("name")
-                .get(pk=instance.pk)
-                .name
-            )
+            instance._old_name = sender.objects.only("name").get(pk=instance.pk).name
         except sender.DoesNotExist:
             instance._old_name = None
     else:
         instance._old_name = None
+
 
 @receiver(post_save, sender=Zone)
 def sync_catalog_zone_identifier(sender, instance, created, **kwargs):

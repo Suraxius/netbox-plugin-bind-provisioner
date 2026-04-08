@@ -21,13 +21,12 @@ from netbox_dns_bridge.models import IntegerKeyValueSetting
 
 logger = logging.getLogger(__name__)
 
+
 class Command(BaseCommand):
     help = "Run a minimal AXFR DNS server using data from NetBox DNS plugin"
 
     def load_settings(self):
-        self.settings = settings.PLUGINS_CONFIG.get(
-            "netbox_dns_bridge", None
-        )
+        self.settings = settings.PLUGINS_CONFIG.get("netbox_dns_bridge", None)
         if not self.settings:
             raise RuntimeError(
                 "Command failed to initialize due to missing settings. Terminating Netbox."

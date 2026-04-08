@@ -7,16 +7,19 @@ import netbox_dns.models
 from netbox_dns_bridge.utils import export_bind_zone_file
 from django.core.management.base import BaseCommand, CommandError
 
+
 class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument(
-            "--path", type=str, help="Path to the directory where zone files are to be written"
+            "--path",
+            type=str,
+            help="Path to the directory where zone files are to be written",
         )
 
     def handle(self, *args, **options):
         # Load parameters
-        base_path = options['path']
+        base_path = options["path"]
 
         if not base_path:
             raise CommandError("No --path parameter given")
@@ -42,6 +45,8 @@ class Command(BaseCommand):
             try:
                 # Call existing export function
                 export_bind_zone_file(zone, file_path=file_path)
-                self.stdout.write(self.style.SUCCESS(f"Exported zone '{zone.name}' to '{file_path}'"))
+                self.stdout.write(
+                    self.style.SUCCESS(f"Exported zone '{zone.name}' to '{file_path}'")
+                )
             except Exception as e:
                 self.stderr.write(f"Failed to export zone '{zone.name}': {e}")

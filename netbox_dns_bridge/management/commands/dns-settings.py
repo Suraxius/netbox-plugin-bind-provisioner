@@ -6,9 +6,13 @@ class Command(BaseCommand):
     help = "Get or set integer key-value settings"
 
     def add_arguments(self, parser):
-        parser.add_argument("action", choices=["get", "set", "list"], help="Action to perform")
+        parser.add_argument(
+            "action", choices=["get", "set", "list"], help="Action to perform"
+        )
         parser.add_argument("key", nargs="?", help="Setting key")
-        parser.add_argument("value", nargs="?", type=int, help="Value to set (required for 'set')")
+        parser.add_argument(
+            "value", nargs="?", type=int, help="Value to set (required for 'set')"
+        )
 
     def handle(self, *args, **options):
         action = options["action"]

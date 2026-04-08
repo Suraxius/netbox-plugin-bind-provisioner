@@ -32,7 +32,7 @@ For proper operation, each view requires an installed TSIG key, and the `dns-tra
 be running as a separate background service using the `manage.py` command. Note that DNSSEC support
 will be added once BIND9 provides a mechanism to configure it through the Catalog Zones system.
 
-To start the service in the foreground:
+To start the transfer endpoint service in the foreground:
 ```
 manage.py dns-transfer-endpoint --port 5354
 ```
@@ -51,10 +51,11 @@ Setting             | Description
 --------------------| ---------------------------------------------------------
 tsig_keys           | Maps a TSIG Key to be used for each view.
 
-## Tested Setup Combinations
-Netbox | Netbox DNS | DNS Provisioner
------- | ---------- | ---------------
-4.5.0  | 1.5.0      | 1.0.7
+## Plugin compatibility
+This plugin is an extension to the netbox-plugin-dns plugin. As such the versioning of this plugin
+was changed to match the one of the netbox-plugin-dns plugin closely. To guarantee compatability,
+ensure that the major and minor version match between both plugins.
+For example, when using netbox-plugin-dns `v1.5.5` install netbox-plugin-dns-bridge `v1.5.x`
 
 ## Installation guide
 This setup provisions a BIND9 server directly with DNS data from NetBox. BIND9 can optionally run on

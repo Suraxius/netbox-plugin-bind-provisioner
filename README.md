@@ -21,6 +21,8 @@ using DNS native mechanisms.
 
 ![Architecture Overview](docs/architecture-overview.svg)
 
+DISCLAIMER: The dynamic update endpoint isn't here yet. Its planned - without a deadline.
+
 ## Plugin configuration
 While providing Zone transfers via AXFR, the Server also exposes specialized catalog zones that BIND
 and other RFC9432 compliant DNS Servers use to automatically discover newly created zones and remove

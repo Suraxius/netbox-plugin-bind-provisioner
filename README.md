@@ -1,4 +1,6 @@
-# Netbox DNS Bridge (Formerly Netbox Bind Provisioner)
+# Netbox DNS Bridge
+(Formerly Netbox Bind Provisioner)
+
 The Netbox DNS Bridge plugin implements a lightweight DNS server inside Netbox and builds a bridge
 for BIND and other DNS Servers implementing RFC9432 to retrieve DNS Zones directly from Netbox
 using DNS native mechanisms.

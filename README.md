@@ -84,7 +84,7 @@ Make sure to note down the catalog zone serial number before going further.
 3. Adjust your `configuration.py`
     - Change the plugin name from `netbox-plugin-bind-provisioner` to `netbox-plugin-dns-bridge`
     - Change the key in `PLUGIN_CONFIG` from `netbox_plugin_bind_provisioner` to `netbox_dns_bridge`
-4. Ensure the `dns-transfer-endpoint` service is not running before the next step.
+4. Run migrations: `manage.py migrate`
 5. Restore the catalog zone serial you noted down previously so that your slave dns servers continue
    to pull the changes: `manage.py dns-settings set catalog-zone-soa-serial yourserialnumber`
 6. Start the `dns-transfer-endpoint` service.
@@ -160,7 +160,7 @@ This guide assumes:
 
 4. Run migrations
     ```
-    python3 netbox/manage.py migrate
+    manage.py migrate
     ```
 
 5. Start listener
@@ -172,7 +172,7 @@ This guide assumes:
 
     Note that `--port 5354` is optional. The listener will bind this port by default.
     ```
-    python3 netbox/manage.py dns-transfer-endpoint --port 5354
+    manage.py dns-transfer-endpoint --port 5354
     ```
 
 6. Configuring a Bind9 to interact with Netbox via the dns-transfer-endpoint endpoint. Note that its

@@ -125,13 +125,13 @@ class DNSBaseRequestHandler(socketserver.BaseRequestHandler):
         response.set_rcode(dns.rcode.REFUSED)
 
         if query.had_tsig:
-            # Add TSIG with BADKEY, but do not sign (no MAC)
+            # Add TSIG with error code, but do not sign (no MAC, empty keyring)
             response.use_tsig(
                 keyring={},  # empty; we're not signing
                 keyname=query.keyname,
                 tsig_error=tsig_error,
             )
-        self._deny_request(query)
+        self._send_response(response.to_wire())
 
     def _send_response(self, data) -> None:
         raise NotImplementedError
@@ -164,14 +164,11 @@ class DNSBaseRequestHandler(socketserver.BaseRequestHandler):
                     self.server.keyring, keyname=query.keyname, original_id=query.id
                 )
             else:
-                # If key is unknown
+                # unknown key — use an empty keyring so use_tsig() does not
+                # raise KeyError trying to look up a key that isn't present.
                 response.set_rcode(dns.rcode.REFUSED)
-                # Generate new key for keyname provided
-                # keyname = query.keyname
-                # b64 = base64.b64encode(urandom(32)).decode("ascii")
-                # newkey = dns.tsigkeyring.from_text({ keyname: b64 })
                 response.use_tsig(
-                    self.server.keyring,
+                    {},  # empty keyring; no signing
                     keyname=query.keyname,
                     tsig_error=dns.rcode.BADKEY,
                 )
@@ -181,6 +178,13 @@ class DNSBaseRequestHandler(socketserver.BaseRequestHandler):
         logger.debug(f"{peer} SOA {nb_view.name}/{dname}")
 
     def _handle_axfr_request(self, query, zone, peer, nb_view, dname) -> None:
+        if query.keyname not in self.server.keyring:
+            logger.error(f"AXFR aborted: keyname {query.keyname} not in keyring")
+            self._deny_request(query)
+            return
+
+        tsig_key = self.server.keyring[query.keyname]
+
         rrsets = []
         soa_rrset = None
         for name, rdataset in zone.iterate_rdatasets():
@@ -209,12 +213,9 @@ class DNSBaseRequestHandler(socketserver.BaseRequestHandler):
         )
 
         # 3. Loop through RRsets
-        tsig_key = self.server.keyring[query.keyname]
         tsig_ctx = None
         for rrset in rrsets:
-            # logger.debug(f"Iterating over rrset {rrset}. tsig_ctx: {tsig_ctx}")
             try:
-                # logger.debug(f"Adding {rrset} to renderer object")
                 r.add_rrset(dns.renderer.ANSWER, rrset)
                 if r.max_size - len(r.output.getvalue()) < self.RESERVED_TSIG:
                     raise dns.exception.TooBig("TSIG wont fit")
@@ -247,7 +248,15 @@ class DNSBaseRequestHandler(socketserver.BaseRequestHandler):
                     query.question[0].rdtype,
                     query.question[0].rdclass,
                 )
-                r.add_rrset(dns.renderer.ANSWER, rrset)
+
+                try:
+                    r.add_rrset(dns.renderer.ANSWER, rrset)
+                except dns.exception.TooBig:
+                    logger.error(
+                        f"RRset {rrset.name}/{dns.rdatatype.to_text(rrset.rdtype)} "
+                        f"exceeds MAX_WIRE ({self.MAX_WIRE}) and cannot be sent; "
+                        f"skipping."
+                    )
 
         # 4. Final message with terminating TSIG
         r.write_header()
@@ -262,7 +271,6 @@ class DNSBaseRequestHandler(socketserver.BaseRequestHandler):
             other_data=b"",
             request_mac=r.mac if tsig_ctx else query.mac,
         )
-
         wire = r.get_wire()
         self._send_response(wire)
 

@@ -62,12 +62,10 @@ def _set_serial(new_serial: int) -> bool:
 def _increment_serial() -> None:
     if not _set_serial(_SERIAL_OBJ.value + 1):
         logger.warning(
-            f"Failed to incremenet catalog serial {_SERIAL_OBJ.value}. Will overflow serial back to 1"
+            f"Catalog serial {_SERIAL_OBJ.value} reached max — wrapping back to 1"
         )
         _set_serial(1)
-        logger.debug(
-            f"Catalog zone SOA serial number incremented to {_SERIAL_OBJ.value}"
-        )
+    logger.debug(f"Catalog zone SOA serial number is now {_SERIAL_OBJ.value}")
 
 
 # If a zone has no catz identifier yet, create it:
@@ -230,5 +228,5 @@ def _generate_member_identifier() -> None:
 def update_member_identifier(zone: Zone) -> None:
     CatalogZoneMemberIdentifier.objects.update_or_create(
         zone=zone,
-        defaults={"name": _generate_member_identifier},
+        defaults={"name": _generate_member_identifier()},
     )

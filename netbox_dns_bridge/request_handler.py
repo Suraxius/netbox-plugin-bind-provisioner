@@ -175,7 +175,7 @@ class DNSBaseRequestHandler(socketserver.BaseRequestHandler):
 
         data = response.to_wire(max_size=512)
         self._send_response(data)
-        logger.debug(f"{peer} SOA {nb_view.name}/{dname}")
+        logger.info(f"{peer} SOA {nb_view.name}/{dname}")
 
     def _handle_axfr_request(self, query, zone, peer, nb_view, dname) -> None:
         if query.keyname not in self.server.keyring:
@@ -274,7 +274,7 @@ class DNSBaseRequestHandler(socketserver.BaseRequestHandler):
         wire = r.get_wire()
         self._send_response(wire)
 
-        logger.debug(f"{peer} AXFR {nb_view.name}/{dname}")
+        logger.info(f"{peer} AXFR {nb_view.name}/{dname}")
 
     def _handle_dns_query(self, wire) -> None:
         peer = self.client_address[0]

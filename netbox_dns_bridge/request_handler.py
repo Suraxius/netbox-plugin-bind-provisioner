@@ -209,6 +209,7 @@ class DNSBaseRequestHandler(socketserver.BaseRequestHandler):
         )
 
         # 3. Loop through RRsets
+        tsig_key = self.server.keyring[query.keyname]
         tsig_ctx = None
         for rrset in rrsets:
             # logger.debug(f"Iterating over rrset {rrset}. tsig_ctx: {tsig_ctx}")
@@ -222,7 +223,8 @@ class DNSBaseRequestHandler(socketserver.BaseRequestHandler):
                 r.write_header()
                 tsig_ctx = r.add_multi_tsig(
                     ctx=tsig_ctx,
-                    secret=self.server.keyring[query.keyname],
+                    secret=tsig_key.secret,
+                    algorithm=tsig_key.algorithm,
                     keyname=query.keyname,
                     fudge=300,
                     id=query.id,
@@ -249,18 +251,18 @@ class DNSBaseRequestHandler(socketserver.BaseRequestHandler):
 
         # 4. Final message with terminating TSIG
         r.write_header()
-        # logger.debug(f"Final message. tsig_ctx: {tsig_ctx}")
         tsig_ctx = r.add_multi_tsig(
             ctx=tsig_ctx,
-            secret=self.server.keyring[query.keyname],
+            secret=tsig_key.secret,
+            algorithm=tsig_key.algorithm,
             keyname=query.keyname,
             fudge=300,
             id=query.id,
             tsig_error=0,
             other_data=b"",
-            # request_mac=r.mac if tsig_ctx else None,
             request_mac=r.mac if tsig_ctx else query.mac,
         )
+
         wire = r.get_wire()
         self._send_response(wire)
 

@@ -1,9 +1,10 @@
 # Netbox DNS Bridge
 (Formerly Netbox Bind Provisioner)
 
-The Netbox DNS Bridge plugin implements a lightweight DNS server inside Netbox and builds a bridge
-for BIND and other DNS Servers implementing RFC9432 to retrieve DNS Zones directly from Netbox
-using DNS native mechanisms.
+The NetBox DNS Bridge plugin extends [NetBox DNS](https://github.com/sys4/netbox-plugin-dns) by
+embedding a lightweight DNS server directly within NetBox. It acts as a bridge between NetBox DNS
+and your existing DNS infrastructure, leveraging native DNS mechanisms for seamless integration.
+These include zone transfers (RFC 5936), catalog zones (RFC 9432), and dynamic updates (RFC 2136).
 
 <a href="https://pypi.org/project/netbox-plugin-dns-bridge/"><img src="https://img.shields.io/pypi/v/netbox-plugin-dns-bridge" alt="PyPi"></a>
 <a href="https://github.com/suraxius/netbox-plugin-bind-provisioner/stargazers"><img src="https://img.shields.io/github/stars/suraxius/netbox-plugin-bind-provisioner?style=flat" alt="Stars Badge"></a>

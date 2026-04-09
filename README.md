@@ -5,7 +5,7 @@ The Netbox DNS Bridge plugin implements a lightweight DNS server inside Netbox a
 for BIND and other DNS Servers implementing RFC9432 to retrieve DNS Zones directly from Netbox
 using DNS native mechanisms.
 
-<a href="https://pypi.org/project/netbox-plugin-bind-provisioner/"><img src="https://img.shields.io/pypi/v/netbox-plugin-bind-provisioner" alt="PyPi"></a>
+<a href="https://pypi.org/project/netbox-plugin-dns-bridge/"><img src="https://img.shields.io/pypi/v/netbox-plugin-dns-bridge" alt="PyPi"></a>
 <a href="https://github.com/suraxius/netbox-plugin-bind-provisioner/stargazers"><img src="https://img.shields.io/github/stars/suraxius/netbox-plugin-bind-provisioner?style=flat" alt="Stars Badge"></a>
 <a href="https://github.com/suraxius/netbox-plugin-bind-provisioner/network/members"><img src="https://img.shields.io/github/forks/suraxius/netbox-plugin-bind-provisioner?style=flat" alt="Forks Badge"></a>
 <a href="https://github.com/suraxius/netbox-plugin-bind-provisioner/issues"><img src="https://img.shields.io/github/issues/suraxius/netbox-plugin-bind-provisioner" alt="Issues Badge"></a>
@@ -13,9 +13,9 @@ using DNS native mechanisms.
 <a href="https://github.com/suraxius/netbox-plugin-bind-provisioner/graphs/contributors"><img src="https://img.shields.io/github/contributors/suraxius/netbox-plugin-bind-provisioner?color=2b9348" alt="GitHub contributors"></a>
 <a href="https://github.com/suraxius/netbox-plugin-bind-provisioner/blob/master/LICENSE"><img src="https://img.shields.io/github/license/suraxius/netbox-plugin-bind-provisioner?color=2b9348" alt="License Badge"></a>
 <a href="https://github.com/psf/black"><img src="https://img.shields.io/badge/code%20style-black-000000.svg" alt="Code Style Black"></a>
-<a href="https://pepy.tech/project/netbox-plugin-bind-provisioner"><img src="https://static.pepy.tech/personalized-badge/netbox-plugin-bind-provisioner?period=total&left_color=BLACK&right_color=BLUE&left_text=Downloads" alt="Downloads"></a>
-<a href="https://pepy.tech/project/netbox-plugin-bind-provisioner"><img src="https://static.pepy.tech/personalized-badge/netbox-plugin-bind-provisioner?period=monthly&left_color=BLACK&right_color=BLUE&left_text=Downloads%2fMonth" alt="Downloads/Week"></a>
-<a href="https://pepy.tech/project/netbox-plugin-bind-provisioner"><img src="https://static.pepy.tech/personalized-badge/netbox-plugin-bind-provisioner?period=weekly&left_color=BLACK&right_color=BLUE&left_text=Downloads%2fWeek" alt="Downloads/Month"></a>
+<a href="https://pepy.tech/project/netbox-plugin-dns-bridge"><img src="https://static.pepy.tech/personalized-badge/netbox-plugin-dns-bridge?period=total&left_color=BLACK&right_color=BLUE&left_text=Downloads" alt="Downloads"></a>
+<a href="https://pepy.tech/project/netbox-plugin-dns-bridge"><img src="https://static.pepy.tech/personalized-badge/netbox-plugin-dns-bridge?period=monthly&left_color=BLACK&right_color=BLUE&left_text=Downloads%2fMonth" alt="Downloads/Week"></a>
+<a href="https://pepy.tech/project/netbox-plugin-dns-bridge"><img src="https://static.pepy.tech/personalized-badge/netbox-plugin-dns-bridge?period=weekly&left_color=BLACK&right_color=BLUE&left_text=Downloads%2fWeek" alt="Downloads/Month"></a>
 
 
 
@@ -59,28 +59,36 @@ tsig_keys           | Maps a TSIG Key to be used for each view.
 This plugin is an extension to the netbox-plugin-dns plugin. As such the versioning of this plugin
 was changed to match the one of the netbox-plugin-dns plugin closely. To guarantee compatability,
 ensure that the major and minor version match between both plugins.
-For example, when using netbox-plugin-dns `v1.5.5` install netbox-plugin-dns-bridge `v1.5.x`
+For example, when using netbox-plugin-dns `v1.5.5` install netbox-plugin-dns-bridge `v1.5.x`.
 
 ## Post 1.0.7 Upgrade Guide
-After version 1.0.7, the project was restructured and renamed. Until that point version updates happened more or less
-automatically. However, this shift is more of a move from one plugin to another as the package name has changed.
+Applies only if you have a <= 1.0.7 installation. If you are freshly installing this plugin,
+go on to [Installation guide](installation-guide).
 
-This should not be an issue since the slave DNS Servers connected to Netbox can operate independently while this plugin
-is being upgraded.
+After version 1.0.7, the project was restructured and renamed. Until that point version updates
+happened more or less automatically. However, this shift is more of a move from one plugin to
+another as the package name has changed.
 
-Make sure to note down the catalog zone serial number before switching.
+This should not be an issue since the slave DNS Servers connected to Netbox can operate
+independently while this plugin is being upgraded.
+
+Make sure to note down the catalog zone serial number before going further.
 
 1. Remove Netbox Bind Provisioner package
     - Remove `netbox-plugin-bind-provisioner` from **local_dependencies.txt**
     - Uninstall the package: `pip uninstall netbox-plugin-bind-provisioner`
 2. Install Netbox DNS Bridge package
     - Install the package `pip install netbox-plugin-dns-bridge`
-    - Put `netbox-plugin-dns-bridge` in your **local_dependencies.txt** so it will be installed on next upgrade.
-3. Follow the Installation Guide below.
+    - Put `netbox-plugin-dns-bridge` in your **local_dependencies.txt** so it will be installed on
+      next upgrade.
+3. Adjust your `configuration.py`
+    - Change the plugin name from `netbox-plugin-bind-provisioner` to `netbox-plugin-dns-bridge`
+    - Change the key in `PLUGIN_CONFIG` from `netbox_plugin_bind_provisioner` to `netbox_dns_bridge`
 4. Ensure the `dns-transfer-endpoint` service is not running before the next step.
 5. Restore the catalog zone serial you noted down previously so that your slave dns servers continue
    to pull the changes: `manage.py dns-settings set catalog-zone-soa-serial yourserialnumber`
-6. Start the `dns-transfer-endpoint` service. This should be it.
+6. Start the `dns-transfer-endpoint` service.
+7. Mission accomplished.
 
 ## Installation guide
 This setup provisions a BIND9 server directly with DNS data from NetBox. BIND9 can optionally run on
@@ -103,7 +111,7 @@ This guide assumes:
 2. Adding required package
     ```
     cd netbox
-    echo netbox-plugin-bind-provisioner >> local_requirements.txt
+    echo netbox-plugin-dns-bridge >> local_requirements.txt
     . venv/bin/activate
     pip install -r local_requirements.txt
     ```

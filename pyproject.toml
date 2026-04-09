@@ -9,7 +9,7 @@ description = "A bridge between netbox-plugin-dns and your DNS infrastructure."
 authors = [
     { name = "Sven Luethi" },
 ]
-license = { text = "GPL-2.0" }
+license = { file = "LICENSE.md" }
 readme = "README.md"
 requires-python = ">=3.7"
 dependencies = [

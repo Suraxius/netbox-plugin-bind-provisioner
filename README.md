@@ -7,12 +7,12 @@ and your existing DNS infrastructure, leveraging native DNS mechanisms for seaml
 These include zone transfers (RFC 5936), catalog zones (RFC 9432), and dynamic updates (RFC 2136).
 
 <a href="https://pypi.org/project/netbox-plugin-dns-bridge/"><img src="https://img.shields.io/pypi/v/netbox-plugin-dns-bridge" alt="PyPi"></a>
-<a href="https://github.com/suraxius/netbox-plugin-bind-provisioner/stargazers"><img src="https://img.shields.io/github/stars/suraxius/netbox-plugin-bind-provisioner?style=flat" alt="Stars Badge"></a>
-<a href="https://github.com/suraxius/netbox-plugin-bind-provisioner/network/members"><img src="https://img.shields.io/github/forks/suraxius/netbox-plugin-bind-provisioner?style=flat" alt="Forks Badge"></a>
-<a href="https://github.com/suraxius/netbox-plugin-bind-provisioner/issues"><img src="https://img.shields.io/github/issues/suraxius/netbox-plugin-bind-provisioner" alt="Issues Badge"></a>
-<a href="https://github.com/suraxius/netbox-plugin-bind-provisioner/pulls"><img src="https://img.shields.io/github/issues-pr/suraxius/netbox-plugin-bind-provisioner" alt="Pull Requests Badge"></a>
-<a href="https://github.com/suraxius/netbox-plugin-bind-provisioner/graphs/contributors"><img src="https://img.shields.io/github/contributors/suraxius/netbox-plugin-bind-provisioner?color=2b9348" alt="GitHub contributors"></a>
-<a href="https://github.com/suraxius/netbox-plugin-bind-provisioner/blob/master/LICENSE"><img src="https://img.shields.io/github/license/suraxius/netbox-plugin-bind-provisioner?color=2b9348" alt="License Badge"></a>
+<a href="https://github.com/suraxius/netbox-plugin-dns-bridge/stargazers"><img src="https://img.shields.io/github/stars/suraxius/netbox-plugin-dns-bridge?style=flat" alt="Stars Badge"></a>
+<a href="https://github.com/suraxius/netbox-plugin-dns-bridge/network/members"><img src="https://img.shields.io/github/forks/suraxius/netbox-plugin-dns-bridge?style=flat" alt="Forks Badge"></a>
+<a href="https://github.com/suraxius/netbox-plugin-dns-bridge/issues"><img src="https://img.shields.io/github/issues/suraxius/netbox-plugin-dns-bridge" alt="Issues Badge"></a>
+<a href="https://github.com/suraxius/netbox-plugin-dns-bridge/pulls"><img src="https://img.shields.io/github/issues-pr/suraxius/netbox-plugin-dns-bridge" alt="Pull Requests Badge"></a>
+<a href="https://github.com/suraxius/netbox-plugin-dns-bridge/graphs/contributors"><img src="https://img.shields.io/github/contributors/suraxius/netbox-plugin-dns-bridge?color=2b9348" alt="GitHub contributors"></a>
+<a href="https://github.com/suraxius/netbox-plugin-dns-bridge/blob/master/LICENSE"><img src="https://img.shields.io/github/license/suraxius/netbox-plugin-dns-bridge?color=2b9348" alt="License Badge"></a>
 <a href="https://github.com/psf/black"><img src="https://img.shields.io/badge/code%20style-black-000000.svg" alt="Code Style Black"></a>
 <a href="https://pepy.tech/project/netbox-plugin-dns-bridge"><img src="https://static.pepy.tech/personalized-badge/netbox-plugin-dns-bridge?period=total&left_color=BLACK&right_color=BLUE&left_text=Downloads" alt="Downloads"></a>
 <a href="https://pepy.tech/project/netbox-plugin-dns-bridge"><img src="https://static.pepy.tech/personalized-badge/netbox-plugin-dns-bridge?period=monthly&left_color=BLACK&right_color=BLUE&left_text=Downloads%2fMonth" alt="Downloads/Week"></a>

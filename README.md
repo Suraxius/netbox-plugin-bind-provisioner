@@ -63,7 +63,7 @@ For example, when using netbox-plugin-dns `v1.5.5` install netbox-plugin-dns-bri
 
 ## Post 1.0.7 Upgrade Guide
 Applies only if you have a <= 1.0.7 installation. If you are freshly installing this plugin,
-go on to [Installation guide](installation-guide).
+go on to [Installation Guide](#installation-guide).
 
 After version 1.0.7, the project was restructured and renamed. Until that point version updates
 happened more or less automatically. However, this shift is more of a move from one plugin to

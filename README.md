@@ -15,8 +15,8 @@ These include zone transfers (RFC 5936), catalog zones (RFC 9432), and dynamic u
 <a href="https://github.com/suraxius/netbox-plugin-dns-bridge/blob/master/LICENSE"><img src="https://img.shields.io/github/license/suraxius/netbox-plugin-dns-bridge?color=2b9348" alt="License Badge"></a>
 <a href="https://github.com/psf/black"><img src="https://img.shields.io/badge/code%20style-black-000000.svg" alt="Code Style Black"></a>
 <a href="https://pepy.tech/project/netbox-plugin-dns-bridge"><img src="https://static.pepy.tech/personalized-badge/netbox-plugin-dns-bridge?period=total&left_color=BLACK&right_color=BLUE&left_text=Downloads" alt="Downloads"></a>
-<a href="https://pepy.tech/project/netbox-plugin-dns-bridge"><img src="https://static.pepy.tech/personalized-badge/netbox-plugin-dns-bridge?period=monthly&left_color=BLACK&right_color=BLUE&left_text=Downloads%2fMonth" alt="Downloads/Week"></a>
-<a href="https://pepy.tech/project/netbox-plugin-dns-bridge"><img src="https://static.pepy.tech/personalized-badge/netbox-plugin-dns-bridge?period=weekly&left_color=BLACK&right_color=BLUE&left_text=Downloads%2fWeek" alt="Downloads/Month"></a>
+<a href="https://pepy.tech/project/netbox-plugin-dns-bridge"><img src="https://static.pepy.tech/personalized-badge/netbox-plugin-dns-bridge?period=monthly&left_color=BLACK&right_color=BLUE&left_text=Downloads%2fMonth" alt="Downloads/Month"></a>
+<a href="https://pepy.tech/project/netbox-plugin-dns-bridge"><img src="https://static.pepy.tech/personalized-badge/netbox-plugin-dns-bridge?period=weekly&left_color=BLACK&right_color=BLUE&left_text=Downloads%2fWeek" alt="Downloads/Week"></a>
 
 
 

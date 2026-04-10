@@ -1,4 +1,3 @@
-import logging
 import threading
 import dns.query
 import dns.message
@@ -10,13 +9,15 @@ import dns.rdataclass
 import dns.rdtypes
 import dns.exception
 import dns.renderer
+import logging
+from .logger import get_logger
 from netbox_dns.models import Zone
 from netbox_dns.choices import ZoneStatusChoices
 from netbox_dns_bridge.models import IntegerKeyValueSetting, CatalogZoneMemberIdentifier
 from uuid import uuid4
 from base64 import b32encode
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 _LOCK = threading.Lock()
 _SERIAL_MAX = 0xFFFFFFFF
@@ -36,7 +37,7 @@ def _init_serial() -> None:
 
     try:
         _SERIAL_OBJ = IntegerKeyValueSetting.objects.get(key="catalog-zone-soa-serial")
-        logger.debug(
+        logger.info(
             f"Catalog zone SOA serial number {_SERIAL_OBJ.value} loaded from database"
         )
     except IntegerKeyValueSetting.DoesNotExist:

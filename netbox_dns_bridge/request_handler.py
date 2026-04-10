@@ -1,4 +1,3 @@
-import logging
 import socketserver
 import socket
 import dns.query
@@ -11,11 +10,13 @@ import dns.rdataclass
 import dns.rdtypes
 import dns.exception
 import dns.renderer
+import logging
+from .logger import get_logger
 from netbox_dns.models import Zone, Record
 from netbox_dns.choices import ZoneStatusChoices, RecordStatusChoices
 from netbox_dns_bridge import catalog_zone_manager as catzm
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class DNSBaseRequestHandler(socketserver.BaseRequestHandler):

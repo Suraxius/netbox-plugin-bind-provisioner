@@ -1,4 +1,3 @@
-import logging
 import threading
 import dns.query
 import dns.message
@@ -10,16 +9,18 @@ import dns.rdataclass
 import dns.rdtypes
 import dns.exception
 import dns.renderer
+import logging
 
 from django.core.management.base import BaseCommand
 from django.conf import settings
 from netbox_dns.models import View
+from netbox_dns_bridge import catalog_zone_manager as catzm
 from netbox_dns_bridge.request_handler import UDPRequestHandler, TCPRequestHandler
 from netbox_dns_bridge.dns_server import UDPDNSServer, TCPDNSServer
-from netbox_dns_bridge import catalog_zone_manager as catzm
 from netbox_dns_bridge.models import IntegerKeyValueSetting
+from netbox_dns_bridge.logger import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class Command(BaseCommand):
@@ -70,7 +71,7 @@ class Command(BaseCommand):
                 name=key_name_obj, secret=secret, algorithm=algorithm_str
             )
             self.tsig_view_map[key_name_str] = nb_view
-            logger.debug(f"Loaded TSIG key: {key_name_str} view: {nb_view.name}")
+            logger.info(f"Loaded TSIG key {key_name_str} for view {nb_view.name}")
 
         if not self.keyring:
             msg = "No TSIG keys found in database."
@@ -104,7 +105,7 @@ class Command(BaseCommand):
         )
 
         def run_udp_server(server):
-            logger.debug(f"Query endpoint listening on {address} udp/{port}")
+            logger.info(f"Query endpoint listening on {address} udp/{port}")
             server.serve_forever()
 
         udp_thread = threading.Thread(
@@ -113,5 +114,5 @@ class Command(BaseCommand):
 
         udp_thread.start()
 
-        logger.debug(f"Query endpoint listening on {address} tcp/{port}")
+        logger.info(f"Query endpoint listening on {address} tcp/{port}")
         tcp_server.serve_forever()

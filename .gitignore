@@ -1,4 +1,6 @@
-netbox_dns_bridge.egg-info
 dist/
 build/
 __pycache__
+venv/
+.venv/
+netbox_plugin_dns_bridge.egg-info/

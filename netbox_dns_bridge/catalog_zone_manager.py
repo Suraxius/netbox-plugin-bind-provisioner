@@ -1,75 +1,48 @@
-import threading
-import dns.query
-import dns.message
-import dns.tsigkeyring
 import dns.name
 import dns.zone
 import dns.rdatatype
 import dns.rdataclass
-import dns.rdtypes
-import dns.exception
-import dns.renderer
-import logging
 from .logger import get_logger
 from netbox_dns.models import Zone
 from netbox_dns.choices import ZoneStatusChoices
 from netbox_dns_bridge.models import IntegerKeyValueSetting, CatalogZoneMemberIdentifier
 from uuid import uuid4
 from base64 import b32encode
+from django.db import transaction
 
 logger = get_logger(__name__)
 
-_LOCK = threading.Lock()
 _SERIAL_MAX = 0xFFFFFFFF
-_SERIAL_OBJ = None
-_PREVIOUS_LAST_ZONE_UPDATE = None
 
 
 def init() -> None:
     _init_serial()
+    _init_last_zone_update_timestamp()
     _create_missing_member_identifiers()
 
 
-# Following function loads the last serial from the DB. No return value
-# but it sets the setting "catalog_serial" or terminates the plugin on failure.
 def _init_serial() -> None:
-    global _SERIAL_OBJ
-
     try:
-        _SERIAL_OBJ = IntegerKeyValueSetting.objects.get(key="catalog-zone-soa-serial")
-        logger.info(
-            f"Catalog zone SOA serial number {_SERIAL_OBJ.value} loaded from database"
-        )
+        IntegerKeyValueSetting.objects.get(key="catalog-zone-soa-serial")
+        logger.info("Catalog zone SOA serial number loaded from database")
     except IntegerKeyValueSetting.DoesNotExist:
-        _SERIAL_OBJ = IntegerKeyValueSetting.objects.create(
+        IntegerKeyValueSetting.objects.create(
             key="catalog-zone-soa-serial", value=1
         )
-        logger.debug(
-            f"Catalog zone SOA serial number was not set in the database. Set to {_SERIAL_OBJ.value}"
+        logger.debug("Catalog zone SOA serial number was not set in the database. Set to 1")
+
+
+def _init_last_zone_update_timestamp() -> None:
+    try:
+        IntegerKeyValueSetting.objects.get(key="last-zone-update-timestamp")
+        logger.info("Last zone update timestamp loaded from database")
+    except IntegerKeyValueSetting.DoesNotExist:
+        IntegerKeyValueSetting.objects.create(
+            key="last-zone-update-timestamp", value=0
         )
+        logger.debug("Last zone update timestamp was not set in the database. Set to 0")
 
 
-def _set_serial(new_serial: int) -> bool:
-    global _SERIAL_OBJ
-
-    if 0 < new_serial < _SERIAL_MAX:
-        _SERIAL_OBJ.value = new_serial
-        _SERIAL_OBJ.save()
-        return True
-    else:
-        return False
-
-
-def _increment_serial() -> None:
-    if not _set_serial(_SERIAL_OBJ.value + 1):
-        logger.warning(
-            f"Catalog serial {_SERIAL_OBJ.value} reached max — wrapping back to 1"
-        )
-        _set_serial(1)
-    logger.debug(f"Catalog zone SOA serial number is now {_SERIAL_OBJ.value}")
-
-
-# If a zone has no catz identifier yet, create it:
 def _create_missing_member_identifiers() -> None:
     existing_zone_ids = CatalogZoneMemberIdentifier.objects.values_list(
         "zone_id", flat=True
@@ -87,7 +60,7 @@ def _create_missing_member_identifiers() -> None:
 
     for identifier in new_objects:
         logger.debug(
-            f"Zone {identifier.zone} has no catz member identifier. Creating..."
+            f"Zone {identifier.zone} missing catz member identifier. Creating..."
         )
 
     CatalogZoneMemberIdentifier.objects.bulk_create(
@@ -97,9 +70,17 @@ def _create_missing_member_identifiers() -> None:
 
 
 def create_zone(name, view_name) -> dns.zone.Zone:
-    global _PREVIOUS_LAST_ZONE_UPDATE
-    # Synchronize following across threads as TCP and UDP listener both use it.
-    with _LOCK:
+    # Atomic transaction with row-level locking to prevent diverging state
+    current_serial: int
+
+    with transaction.atomic():
+        serial_setting = IntegerKeyValueSetting.objects.select_for_update().get(
+            key="catalog-zone-soa-serial"
+        )
+        timestamp_setting = IntegerKeyValueSetting.objects.select_for_update().get(
+            key="last-zone-update-timestamp"
+        )
+
         latest_zone = (
             Zone.objects.filter(status=ZoneStatusChoices.STATUS_ACTIVE)
             .order_by("-last_updated")
@@ -107,17 +88,32 @@ def create_zone(name, view_name) -> dns.zone.Zone:
         )
 
         last_zone_update = getattr(latest_zone, "last_updated", None)
+        last_zone_update_ts = (
+            int(last_zone_update.timestamp()) if last_zone_update else 0
+        )
 
-        # Check if there was a zone updated since last call
-        # If no zone was found previously then this will be false since (None != None) = False
-        if _PREVIOUS_LAST_ZONE_UPDATE != last_zone_update:
+        # Check if any zone was updated since last call
+        if timestamp_setting.value != last_zone_update_ts:
             if last_zone_update is not None:
                 logger.debug(
                     f"Zone {latest_zone.name} was updated in view {latest_zone.view.name}"
                 )
-            # Setting previous last zone update for next iteration:
-            _PREVIOUS_LAST_ZONE_UPDATE = last_zone_update
-            _increment_serial()
+            # Update timestamp for next iteration
+            timestamp_setting.value = last_zone_update_ts
+            timestamp_setting.save()
+
+            # Increment serial
+            new_serial = serial_setting.value + 1
+            if new_serial > _SERIAL_MAX:
+                logger.warning(
+                    f"Catalog serial {serial_setting.value} reached max — wrapping back to 1"
+                )
+                new_serial = 1
+            serial_setting.value = new_serial
+            serial_setting.save()
+            logger.debug(f"Catalog zone SOA serial number is now {serial_setting.value}")
+
+        current_serial = serial_setting.value
 
     # Zone origin
     origin = dns.name.from_text(name, dns.name.root)
@@ -138,13 +134,12 @@ def create_zone(name, view_name) -> dns.zone.Zone:
         qname = dns.name.from_text(nb_zone.name, dns.name.root)
 
         # Create PTR record
-        # p_name = f"zid-{nb_zone.id:09d}"
         p_name = nb_zone.catz_identifier.name
 
         ptr_name = dns.name.from_text(p_name, ptr_base)
         if not ptr_name.is_subdomain(origin):
             raise ValueError(
-                "Catalog zone member identifier {ptr_name.to_text()} not a subdomain"
+                f"Catalog zone member identifier {ptr_name.to_text()} not a subdomain"
             )
         rdata = dns.rdata.from_text(
             dns.rdataclass.IN, dns.rdatatype.PTR, qname.to_text()
@@ -154,7 +149,6 @@ def create_zone(name, view_name) -> dns.zone.Zone:
 
         # Configure DNSSec Policy for member Zone if DNSSec is enabled
         if nb_zone.dnssec_policy:
-            # Configure policy
             rid = dns.name.from_text("group", ptr_name)
             policy_name = nb_zone.dnssec_policy.name.rstrip(" ")
             group_name = f"dnssec-policy-{policy_name}"
@@ -164,20 +158,12 @@ def create_zone(name, view_name) -> dns.zone.Zone:
             rdataset = zone.find_rdataset(rid, dns.rdatatype.TXT, create=True)
             rdataset.add(rdata, ttl)
 
-        ## Configure dnssec status for member zone
-        # status = str(1 if nb_zone.dnssec_policy else 0)
-        # rid = dns.name.from_text("enabled.dnssec.ext", ptr_name)
-        # rdata = dns.rdata.from_text(dns.rdataclass.IN, dns.rdatatype.TXT, status)
-        # rdataset = zone.find_rdataset(rid, dns.rdatatype.TXT, create=True)
-        # rdataset.add(rdata, ttl)
-
     # SOA Record components
     ttl = 0
     rclass = dns.rdataclass.IN
     rtype = dns.rdatatype.SOA
     mname = dns.name.from_text("invalid", dns.name.root)
     rname = dns.name.from_text("invalid", dns.name.root)
-    serial = _SERIAL_OBJ.value
     refresh = 60
     retry = 10
     expire = 1209600
@@ -187,7 +173,7 @@ def create_zone(name, view_name) -> dns.zone.Zone:
     soa_rdata = dns.rdata.from_text(
         rclass,
         rtype,
-        f"{mname} {rname} {serial} {refresh} {retry} {expire} {minimum}",
+        f"{mname} {rname} {current_serial} {refresh} {retry} {expire} {minimum}",
     )
 
     # Create Rdataset and add the RDATA to it
@@ -209,7 +195,7 @@ def create_zone(name, view_name) -> dns.zone.Zone:
     ns_node.rdatasets.append(ns_rdataset)
 
     # TXT record for version.catz.
-    version_name = dns.name.from_text("version", origin)  # relative to origin "catz."
+    version_name = dns.name.from_text("version", origin)
     txt_rdata = dns.rdata.from_text(dns.rdataclass.IN, dns.rdatatype.TXT, '"2"')
 
     txt_rdataset = dns.rdataset.Rdataset(dns.rdataclass.IN, dns.rdatatype.TXT)

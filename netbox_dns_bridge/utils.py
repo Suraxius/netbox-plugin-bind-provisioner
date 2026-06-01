@@ -1,4 +1,3 @@
-import os
 import dns.zone
 import dns.rdatatype
 import dns.rdataclass

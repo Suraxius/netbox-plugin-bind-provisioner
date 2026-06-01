@@ -1,12 +1,11 @@
-import logging
-
 from netbox.plugins import PluginConfig
 from django.conf import settings
 from .logger import get_logger
 
 __version__ = "1.5.3"
 
-logger = logger.get_logger(__name__)
+logger = get_logger(__name__)
+
 
 class DNSBridgeConfig(PluginConfig):
     name = "netbox_dns_bridge"
@@ -24,7 +23,7 @@ class DNSBridgeConfig(PluginConfig):
                 f"{self.name}: Plugin {self.verbose_name} failed to initialize due to missing settings. Terminating Netbox."
             )
 
-        from . import signals as signals
+        from . import signals
 
 
 config = DNSBridgeConfig

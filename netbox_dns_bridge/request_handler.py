@@ -10,11 +10,12 @@ import dns.rdataclass
 import dns.rdtypes
 import dns.exception
 import dns.renderer
-import logging
 from .logger import get_logger
+from django.utils import timezone
 from netbox_dns.models import Zone, Record
 from netbox_dns.choices import ZoneStatusChoices, RecordStatusChoices
 from netbox_dns_bridge import catalog_zone_manager as catzm
+from .models import SeenTransferClients
 
 logger = get_logger(__name__)
 
@@ -274,6 +275,12 @@ class DNSBaseRequestHandler(socketserver.BaseRequestHandler):
         )
         wire = r.get_wire()
         self._send_response(wire)
+
+        SeenTransferClients.objects.update_or_create(
+            source_ip=peer,
+            view=nb_view,
+            defaults={"last_seen": timezone.now()},
+        )
 
         logger.info(f"{peer} AXFR {nb_view.name}/{dname}")
 

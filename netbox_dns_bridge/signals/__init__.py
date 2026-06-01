@@ -1,1 +1,1 @@
-from . import transfer_endpoint
+from . import netbox_dns_zones

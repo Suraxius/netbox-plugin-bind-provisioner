@@ -12,35 +12,41 @@ from django.db import transaction
 
 logger = get_logger(__name__)
 
-_SERIAL_MAX = 0xFFFFFFFF
-
 
 def init() -> None:
-    _init_serial()
-    _init_last_zone_update_timestamp()
+    _init_soa_serial()
     _create_missing_member_identifiers()
 
 
-def _init_serial() -> None:
+def _init_soa_serial() -> None:
     try:
         IntegerKeyValueSetting.objects.get(key="catalog-zone-soa-serial")
         logger.info("Catalog zone SOA serial number loaded from database")
     except IntegerKeyValueSetting.DoesNotExist:
-        IntegerKeyValueSetting.objects.create(
-            key="catalog-zone-soa-serial", value=1
+        IntegerKeyValueSetting.objects.create(key="catalog-zone-soa-serial", value=1)
+        logger.debug(
+            "Catalog zone SOA serial number was not set in the database. Set to 1"
         )
-        logger.debug("Catalog zone SOA serial number was not set in the database. Set to 1")
 
 
-def _init_last_zone_update_timestamp() -> None:
-    try:
-        IntegerKeyValueSetting.objects.get(key="last-zone-update-timestamp")
-        logger.info("Last zone update timestamp loaded from database")
-    except IntegerKeyValueSetting.DoesNotExist:
-        IntegerKeyValueSetting.objects.create(
-            key="last-zone-update-timestamp", value=0
+def increment_soa_serial() -> int:
+    with transaction.atomic():
+        soa_serial = IntegerKeyValueSetting.objects.select_for_update().get(
+            key="catalog-zone-soa-serial"
         )
-        logger.debug("Last zone update timestamp was not set in the database. Set to 0")
+
+        new_soa_serial = soa_serial.value + 1
+        if new_soa_serial > 0xFFFFFFFF:
+            logger.warning(
+                f"Catalog serial {soa_serial.value} reached max — wrapping back to 1"
+            )
+            new_soa_serial = 1
+        soa_serial.value = new_soa_serial
+        soa_serial.save()
+        soa_serial.refresh_from_db()
+        logger.debug(f"Catalog zone SOA serial number is now {soa_serial.value}")
+
+        return soa_serial.value
 
 
 def _create_missing_member_identifiers() -> None:
@@ -70,50 +76,7 @@ def _create_missing_member_identifiers() -> None:
 
 
 def create_zone(name, view_name) -> dns.zone.Zone:
-    # Atomic transaction with row-level locking to prevent diverging state
-    current_serial: int
-
-    with transaction.atomic():
-        serial_setting = IntegerKeyValueSetting.objects.select_for_update().get(
-            key="catalog-zone-soa-serial"
-        )
-        timestamp_setting = IntegerKeyValueSetting.objects.select_for_update().get(
-            key="last-zone-update-timestamp"
-        )
-
-        latest_zone = (
-            Zone.objects.filter(status=ZoneStatusChoices.STATUS_ACTIVE)
-            .order_by("-last_updated")
-            .first()
-        )
-
-        last_zone_update = getattr(latest_zone, "last_updated", None)
-        last_zone_update_ts = (
-            int(last_zone_update.timestamp()) if last_zone_update else 0
-        )
-
-        # Check if any zone was updated since last call
-        if timestamp_setting.value != last_zone_update_ts:
-            if last_zone_update is not None:
-                logger.debug(
-                    f"Zone {latest_zone.name} was updated in view {latest_zone.view.name}"
-                )
-            # Update timestamp for next iteration
-            timestamp_setting.value = last_zone_update_ts
-            timestamp_setting.save()
-
-            # Increment serial
-            new_serial = serial_setting.value + 1
-            if new_serial > _SERIAL_MAX:
-                logger.warning(
-                    f"Catalog serial {serial_setting.value} reached max — wrapping back to 1"
-                )
-                new_serial = 1
-            serial_setting.value = new_serial
-            serial_setting.save()
-            logger.debug(f"Catalog zone SOA serial number is now {serial_setting.value}")
-
-        current_serial = serial_setting.value
+    soa_serial = IntegerKeyValueSetting.objects.get(key="catalog-zone-soa-serial").value
 
     # Zone origin
     origin = dns.name.from_text(name, dns.name.root)
@@ -173,7 +136,7 @@ def create_zone(name, view_name) -> dns.zone.Zone:
     soa_rdata = dns.rdata.from_text(
         rclass,
         rtype,
-        f"{mname} {rname} {current_serial} {refresh} {retry} {expire} {minimum}",
+        f"{mname} {rname} {soa_serial} {refresh} {retry} {expire} {minimum}",
     )
 
     # Create Rdataset and add the RDATA to it
@@ -208,7 +171,7 @@ def create_zone(name, view_name) -> dns.zone.Zone:
     return zone
 
 
-def _generate_member_identifier() -> None:
+def _generate_member_identifier() -> str:
     return b32encode(uuid4().bytes)[0:26].lower().decode("UTF-8")
 
 

@@ -1,7 +1,7 @@
 import socketserver
 import socket
-import logging
 from .logger import get_logger
+
 logger = get_logger(__name__)
 
 

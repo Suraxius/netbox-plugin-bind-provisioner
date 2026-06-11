@@ -47,7 +47,7 @@ Parameter | Description
 
 ### Plugin settings
 Plugin settings should be configured under `PLUGINS_CONFIG` in `netbox_dns_bridge`:
-```json
+```
 PLUGINS_CONFIG = {
     'netbox_dns_bridge': {
         ...
@@ -61,7 +61,7 @@ Following sets the TSIG key that allows clients to query the transfer endpoint a
 be used to sign NOTIFY messages to clients on zone changes. Each view should have its own unique
 key to allow the plugin to identify the view the client is trying to access. Re-using the key for
 multiple views yields unpredicted behavior.
-```json
+```
 'tsig_keys': {
     'the-view-name-here': {
         'keyname': 'the-tsig-key-name-here',

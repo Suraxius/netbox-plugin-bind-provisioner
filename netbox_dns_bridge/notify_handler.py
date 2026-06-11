@@ -12,6 +12,7 @@ from .logger import get_logger
 from .models import SeenTransferClients
 
 logger = get_logger(__name__)
+SETTINGS = settings.PLUGINS_CONFIG["netbox_dns_bridge"]
 
 
 class SendDNSNotify(JobRunner):
@@ -19,7 +20,7 @@ class SendDNSNotify(JobRunner):
         name = "Send DNS NOTIFY"
 
     def _load_tsig_key(self, view_name: str) -> dns.tsig.Key:
-        tsig_keys = settings.PLUGINS_CONFIG["netbox_dns_bridge"].get("tsig_keys", {})
+        tsig_keys = SETTINGS.get("tsig_keys", {})
         if view_name not in tsig_keys:
             raise RuntimeError(f"No TSIG key configured for view '{view_name}'")
 
@@ -50,7 +51,8 @@ class SendDNSNotify(JobRunner):
         view = View.objects.get(name=view_name)
         tsig_key = self._load_tsig_key(view_name)
 
-        seen_cutoff = timezone.now() - timezone.timedelta(hours=1)
+        cutoff_hours = SETTINGS.get("notify_client_dead_after_hours", 24)
+        seen_cutoff = timezone.now() - timezone.timedelta(hours=cutoff_hours)
         clients = SeenTransferClients.objects.filter(
             view=view, last_seen__gte=seen_cutoff
         )

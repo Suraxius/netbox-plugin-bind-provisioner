@@ -1,10 +1,13 @@
 from django.db.models.signals import pre_save, post_save
 from django.dispatch import receiver
 from django.db import transaction
+from django.conf import settings
 from netbox.context import current_request
 from netbox_dns.models import Zone
 from netbox_dns_bridge import catalog_zone_manager as catzm
 from netbox_dns_bridge import notify_handler
+
+SETTINGS = settings.PLUGINS_CONFIG["netbox_dns_bridge"]
 
 
 @receiver(pre_save, sender=Zone)
@@ -31,7 +34,9 @@ def zone_post_save(sender, instance, created, **kwargs):
 
     def _on_commit():
         catzm.increment_soa_serial()
-        notify_handler.schedule(zone)
+
+        if SETTINGS.get("notify_clients", False):
+            notify_handler.schedule(zone)
 
     transaction.on_commit(_on_commit)
 

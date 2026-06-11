@@ -12,7 +12,7 @@ import dns.exception
 import dns.renderer
 from .logger import get_logger
 from django.utils import timezone
-from netbox_dns.models import Zone, Record
+from netbox_dns.models import Zone, Record, View
 from netbox_dns_bridge import catalog_zone_manager as catzm
 from .models import SeenTransferClients
 
@@ -103,7 +103,8 @@ class DNSBaseRequestHandler(socketserver.BaseRequestHandler):
                 # Ensure rdataset has the same rdclass as the zone
                 if rdataset.rdclass != zone.rdclass:
                     raise ValueError(
-                        f"rdataset rdclass {rdataset.rdclass} does not match zone rdclass {zone.rdclass}"
+                        f"rdataset rdclass {rdataset.rdclass} does not match "
+                        f"zone rdclass {zone.rdclass}"
                     )
 
                 # Check if the rdataset has any rdata before creating an RRset
@@ -142,6 +143,13 @@ class DNSBaseRequestHandler(socketserver.BaseRequestHandler):
         response.set_rcode(rcode)
         wire = response.to_wire(multi=False)
         self._send_response(wire)
+
+    def _track_seen_client(source_ip: str, view: View) -> None:
+        SeenTransferClients.objects.update_or_create(
+            source_ip=source_ip,
+            view=view,
+            defaults={"last_seen": timezone.now()},
+        )
 
     def _handle_soa_request(self, query, soa_rrset, zone, peer, nb_view, dname) -> None:
         # We assume that the SOA rdataset has at least one record (it usually does).
@@ -274,13 +282,6 @@ class DNSBaseRequestHandler(socketserver.BaseRequestHandler):
         )
         wire = r.get_wire()
         self._send_response(wire)
-
-        SeenTransferClients.objects.update_or_create(
-            source_ip=peer,
-            view=nb_view,
-            defaults={"last_seen": timezone.now()},
-        )
-
         logger.info(f"{peer} AXFR {nb_view.name}/{dname}")
 
     def _handle_dns_query(self, wire) -> None:
@@ -361,8 +362,10 @@ class DNSBaseRequestHandler(socketserver.BaseRequestHandler):
 
         if qtype == dns.rdatatype.SOA:
             self._handle_soa_request(query, soa_rrset, zone, peer, nb_view, dname)
+            self._track_seen_client(peer, nb_view)
         elif qtype == dns.rdatatype.AXFR:
             self._handle_axfr_request(query, zone, peer, nb_view, dname)
+            self._track_seen_client(peer, nb_view)
 
 
 class UDPRequestHandler(DNSBaseRequestHandler):

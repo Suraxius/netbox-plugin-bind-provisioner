@@ -1,10 +1,10 @@
 # Netbox DNS Bridge
-(Formerly Netbox Bind Provisioner)
 
 The NetBox DNS Bridge plugin extends [NetBox DNS](https://github.com/sys4/netbox-plugin-dns) by
 embedding a lightweight DNS server directly within NetBox. It acts as a bridge between NetBox DNS
 and your existing DNS infrastructure, leveraging native DNS mechanisms for seamless integration.
-These include zone transfers (RFC 5936), catalog zones (RFC 9432), and dynamic updates (RFC 2136).
+These include zone transfers (RFC 5936), catalog zones (RFC 9432), and notifying clients about zone
+changes (RFC 1996).
 
 <a href="https://pypi.org/project/netbox-plugin-dns-bridge/"><img src="https://img.shields.io/pypi/v/netbox-plugin-dns-bridge" alt="PyPi"></a>
 <a href="https://github.com/suraxius/netbox-plugin-dns-bridge/stargazers"><img src="https://img.shields.io/github/stars/suraxius/netbox-plugin-dns-bridge?style=flat" alt="Stars Badge"></a>
@@ -17,12 +17,6 @@ These include zone transfers (RFC 5936), catalog zones (RFC 9432), and dynamic u
 <a href="https://pepy.tech/project/netbox-plugin-dns-bridge"><img src="https://static.pepy.tech/personalized-badge/netbox-plugin-dns-bridge?period=total&left_color=BLACK&right_color=BLUE&left_text=Downloads" alt="Downloads"></a>
 <a href="https://pepy.tech/project/netbox-plugin-dns-bridge"><img src="https://static.pepy.tech/personalized-badge/netbox-plugin-dns-bridge?period=monthly&left_color=BLACK&right_color=BLUE&left_text=Downloads%2fMonth" alt="Downloads/Month"></a>
 <a href="https://pepy.tech/project/netbox-plugin-dns-bridge"><img src="https://static.pepy.tech/personalized-badge/netbox-plugin-dns-bridge?period=weekly&left_color=BLACK&right_color=BLUE&left_text=Downloads%2fWeek" alt="Downloads/Week"></a>
-
-
-
-![Architecture Overview](docs/architecture-overview.svg)
-
-DISCLAIMER: The dynamic update endpoint isn't here yet. Its planned - without a deadline.
 
 ## Plugin configuration
 While providing Zone transfers via AXFR, the Server also exposes specialized catalog zones that BIND
@@ -52,44 +46,55 @@ Parameter | Description
 --address | IP of interface to bind to (defaults to 0.0.0.0)
 
 ### Plugin settings
+Plugin settings should be configured under `PLUGINS_CONFIG` in `netbox_dns_bridge`:
+```json
+PLUGINS_CONFIG = {
+    'netbox_dns_bridge': {
+        ...
+        ...
+    }
+}
+```
+
+#### TSIG Authentication
+Following sets the TSIG key that allows clients to query the transfer endpoint and also they key to
+be used to sign NOTIFY messages to clients on zone changes. Each view should have its own unique
+key to allow the plugin to identify the view the client is trying to access. Re-using the key for
+multiple views yields unpredicted behavior.
+```json
+'tsig_keys': {
+    'the-view-name-here': {
+        'keyname': 'the-tsig-key-name-here',
+        'algorithm': 'hmac-sha256',
+        'secret': 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'
+    }
+}
+```
+
+#### Client notification on zone change
+To enable the NOTIFY feature, set following:
+```
+'notify_clients': True
+```
+This causes the plugin to schedule background jobs which send out NOTIFY messages to all clients
+that have previously successfullly requested a zone transfer from the transfer endpoint.
+
+After how many hours that are client last checked in on a zone with a SOA or transfer request,
+should the client be considered dead and no longer be notified. Default is 24 hours.
+```
+notify_client_dead_after_hours: 24
+```
+
 Setting             | Description
 --------------------| ---------------------------------------------------------
 tsig_keys           | Maps a TSIG Key to be used for each view.
+notify_clients      | When set to true, turns on the notify mechanism to inform downsteams
 
 ## Plugin compatibility
-This plugin is an extension to the netbox-plugin-dns plugin. As such the versioning of this plugin
-was changed to match the one of the netbox-plugin-dns plugin closely. To guarantee compatability,
-ensure that the major and minor version match between both plugins.
-For example, when using netbox-plugin-dns `v1.5.5` install netbox-plugin-dns-bridge `v1.5.x`.
-
-## Post 1.0.7 Upgrade Guide
-Applies only if you have a <= 1.0.7 installation. If you are freshly installing this plugin,
-go on to [Installation Guide](#installation-guide).
-
-After version 1.0.7, the project was restructured and renamed. Until that point version updates
-happened more or less automatically. However, this shift is more of a move from one plugin to
-another as the package name has changed.
-
-This should not be an issue since the slave DNS Servers connected to Netbox can operate
-independently while this plugin is being upgraded.
-
-Make sure to note down the catalog zone serial number before going further.
-
-1. Remove Netbox Bind Provisioner package
-    - Remove `netbox-plugin-bind-provisioner` from **local_dependencies.txt**
-    - Uninstall the package: `pip uninstall netbox-plugin-bind-provisioner`
-2. Install Netbox DNS Bridge package
-    - Install the package `pip install netbox-plugin-dns-bridge`
-    - Put `netbox-plugin-dns-bridge` in your **local_dependencies.txt** so it will be installed on
-      next upgrade.
-3. Adjust your `configuration.py`
-    - Change the plugin name from `netbox-plugin-bind-provisioner` to `netbox-plugin-dns-bridge`
-    - Change the key in `PLUGIN_CONFIG` from `netbox_plugin_bind_provisioner` to `netbox_dns_bridge`
-4. Run migrations: `manage.py migrate`
-5. Restore the catalog zone serial you noted down previously so that your slave dns servers continue
-   to pull the changes: `manage.py dns-settings set catalog-zone-soa-serial yourserialnumber`
-6. Start the `dns-transfer-endpoint` service.
-7. Mission accomplished.
+This plugin extends the netbox-plugin-dns plugin. As such the versioning was changed to match the
+one of netbox-plugin-dns more closely. To guarantee compatability, ensure that the major and minor
+version match between both plugins. For example, when using netbox-plugin-dns `v1.5.5` install
+netbox-plugin-dns-bridge `v1.5.x`.
 
 ## Installation guide
 This setup provisions a BIND9 server directly with DNS data from NetBox. BIND9 can optionally run on
@@ -222,6 +227,7 @@ This guide assumes:
     ########## ZONES ##########
     view "public" {
         match-clients { public; };
+        allow-notify { key "public_view_key"; };
 
         catalog-zones {
             zone "catz"
@@ -240,6 +246,7 @@ This guide assumes:
 
     view "private" {
         match-clients { private; };
+        allow-notify { key "private_view_key"; };
 
         catalog-zones {
             zone "catz"

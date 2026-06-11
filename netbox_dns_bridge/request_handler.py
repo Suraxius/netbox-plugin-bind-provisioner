@@ -13,7 +13,6 @@ import dns.renderer
 import logging
 from .logger import get_logger
 from netbox_dns.models import Zone, Record
-from netbox_dns.choices import ZoneStatusChoices, RecordStatusChoices
 from netbox_dns_bridge import catalog_zone_manager as catzm
 
 logger = get_logger(__name__)
@@ -32,7 +31,7 @@ class DNSBaseRequestHandler(socketserver.BaseRequestHandler):
             nb_zone = Zone.objects.get(
                 name=zone_name,
                 view__name=view_name,
-                status=ZoneStatusChoices.STATUS_ACTIVE,
+                active=True,
             )
         except Zone.DoesNotExist:
             return None
@@ -42,7 +41,7 @@ class DNSBaseRequestHandler(socketserver.BaseRequestHandler):
         zone.rdclass = dns.rdataclass.IN
 
         nb_records = Record.objects.filter(
-            zone=nb_zone, status=RecordStatusChoices.STATUS_ACTIVE
+            zone=nb_zone, active=True
         )
 
         rdatasets_dict = {}

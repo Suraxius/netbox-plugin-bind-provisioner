@@ -12,7 +12,6 @@ import dns.renderer
 import logging
 from .logger import get_logger
 from netbox_dns.models import Zone
-from netbox_dns.choices import ZoneStatusChoices
 from netbox_dns_bridge.models import IntegerKeyValueSetting, CatalogZoneMemberIdentifier
 from uuid import uuid4
 from base64 import b32encode
@@ -101,7 +100,7 @@ def create_zone(name, view_name) -> dns.zone.Zone:
     # Synchronize following across threads as TCP and UDP listener both use it.
     with _LOCK:
         latest_zone = (
-            Zone.objects.filter(status=ZoneStatusChoices.STATUS_ACTIVE)
+            Zone.objects.filter(active=True)
             .order_by("-last_updated")
             .first()
         )
@@ -128,7 +127,7 @@ def create_zone(name, view_name) -> dns.zone.Zone:
 
     # get zones from netbox
     nb_zones = Zone.objects.filter(
-        view__name=view_name, status=ZoneStatusChoices.STATUS_ACTIVE
+        view__name=view_name, active=True
     ).select_related("catz_identifier")
 
     ptr_base = dns.name.from_text("zones", origin)

@@ -85,11 +85,6 @@ should the client be considered dead and no longer be notified. Default is 24 ho
 notify_client_dead_after_hours: 24
 ```
 
-Setting             | Description
---------------------| ---------------------------------------------------------
-tsig_keys           | Maps a TSIG Key to be used for each view.
-notify_clients      | When set to true, turns on the notify mechanism to inform downsteams
-
 ## Plugin compatibility
 This plugin extends the netbox-plugin-dns plugin. As such the versioning was changed to match the
 one of netbox-plugin-dns more closely. To guarantee compatability, ensure that the major and minor

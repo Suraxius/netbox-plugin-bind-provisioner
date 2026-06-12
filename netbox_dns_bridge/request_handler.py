@@ -17,7 +17,7 @@ from netbox_dns_bridge import catalog_zone_manager as catzm
 from .models import SeenTransferClients
 
 logger = get_logger(__name__)
-
+SETTINGS = settings.PLUGINS_CONFIG["netbox_dns_bridge"]
 
 class DNSBaseRequestHandler(socketserver.BaseRequestHandler):
     def __init__(self, request, client_address, server) -> None:
@@ -144,12 +144,13 @@ class DNSBaseRequestHandler(socketserver.BaseRequestHandler):
         wire = response.to_wire(multi=False)
         self._send_response(wire)
 
-    def _track_seen_client(source_ip: str, view: View) -> None:
-        SeenTransferClients.objects.update_or_create(
-            source_ip=source_ip,
-            view=view,
-            defaults={"last_seen": timezone.now()},
-        )
+    def _track_seen_client(self, source_ip: str, view: View) -> None:
+        if SETTINGS.get("notify_clients", False):
+            SeenTransferClients.objects.update_or_create(
+                source_ip=source_ip,
+                view=view,
+                defaults={"last_seen": timezone.now()},
+            )
 
     def _handle_soa_request(self, query, soa_rrset, zone, peer, nb_view, dname) -> None:
         # We assume that the SOA rdataset has at least one record (it usually does).

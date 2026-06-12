@@ -1,4 +1,4 @@
-from django.db.models.signals import pre_save, post_save
+from django.db.models.signals import pre_save, post_save, post_delete
 from django.dispatch import receiver
 from django.db import transaction
 from django.conf import settings
@@ -25,13 +25,17 @@ def zone_pre_save(sender, instance, **kwargs):
 @receiver(post_save, sender=Zone)
 def zone_post_save(sender, instance, created, **kwargs):
     zone = instance
-    request = current_request.get()
-    handled_zones = getattr(request, "_handled_zones", set())
-    if zone.pk in handled_zones:
-        return
-    handled_zones.add(zone.pk)
-    request._handled_zones = handled_zones
 
+    # Quit if this is not the first signal in this session for this zone.
+    request = current_request.get()
+    if request is not None:
+        handled_zones = getattr(request, "_handled_zones", set())
+        if zone.pk in handled_zones:
+            return
+        handled_zones.add(zone.pk)
+        request._handled_zones = handled_zones
+
+    # On commit, increment soa serial and if notify is enabled, schedule bg job.
     def _on_commit():
         catzm.increment_soa_serial()
 
@@ -41,8 +45,14 @@ def zone_post_save(sender, instance, created, **kwargs):
     transaction.on_commit(_on_commit)
 
     if created:
+        # If zone was created, create catz member identifier record for this zone.
         catzm.update_member_identifier(zone)
     else:
+        # Check if zone name has changed and change the catz member identifier if so.
         old_name = getattr(zone, "_old_name", None)
-        if old_name != zone.name:
+        if old_name and zone.name != old_name:
             catzm.update_member_identifier(zone)
+
+@receiver(post_delete, sender=Zone)
+def zone_post_delete(sender, instance, **kwargs):
+    catzm.increment_soa_serial()

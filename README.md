@@ -1,4 +1,4 @@
-# Netbox DNS Bridge
+# NetBox DNS Bridge
 
 The NetBox DNS Bridge plugin extends [NetBox DNS](https://github.com/sys4/netbox-plugin-dns) by
 embedding a lightweight DNS server directly within NetBox. It acts as a bridge between NetBox DNS
@@ -71,19 +71,26 @@ multiple views yields unpredicted behavior.
 }
 ```
 
-#### Client notification on zone change
+#### NOTIFY
+Clients may be notified of zone changes using the NOTIFY mechanism defined in RFC 1996.
+When enabled, the zone transfer endpoint keeps track of any client that successfully queried the
+endpoint and when a zone changes. Once a zone has changed, NetBox informs each client of change.
+
+Note that this feature uses NetBox's background job system to schedule the messages asynchronously.
+In order to work, you need at least one `rq-worker` service running in the background to handle
+the queried jobs.
+
 To enable the NOTIFY feature, set following:
 ```
 'notify_clients': True
 ```
-This causes the plugin to schedule background jobs which send out NOTIFY messages to all clients
-that have previously successfullly requested a zone transfer from the transfer endpoint.
-
-After how many hours that are client last checked in on a zone with a SOA or transfer request,
-should the client be considered dead and no longer be notified. Default is 24 hours.
+##### NOTIFY Settings
 ```
-notify_client_dead_after_hours: 24
+notify_client_alive_threshold_hours: 24
 ```
+This sets how long a client is considred "alive" after it last queried the transfer endpoint. 
+Once the client has failed to check in for this amout of time, it is automatically removed from the
+list of clients to be notified on zone changes. Default is 24 hours.
 
 ## Plugin compatibility
 This plugin extends the netbox-plugin-dns plugin. As such the versioning was changed to match the
@@ -98,10 +105,10 @@ of the NetBox host. TCP and UDP traffic from the BIND9 server to the NetBox host
 port 5354 (or the port you have configured).
 
 This guide assumes:
-- Netbox has been installed under /opt/netbox
-- Bind9 is installed on the same host as Netbox
-- The Netbox DNS Plugin netbox-plugin-dns is installed
-- The following dns views exist in Netbox DNS:
+- NetBox has been installed under /opt/netbox
+- Bind9 is installed on the same host as NetBox
+- The NetBox DNS Plugin netbox-plugin-dns is installed
+- The following dns views exist in NetBox DNS:
     - `public` (the default)
     - `private`
 
@@ -176,7 +183,7 @@ This guide assumes:
     manage.py dns-transfer-endpoint --port 5354
     ```
 
-6. Configuring a Bind9 to interact with Netbox via the dns-transfer-endpoint endpoint. Note that its
+6. Configuring a Bind9 to interact with NetBox via the dns-transfer-endpoint endpoint. Note that its
     not possible to give all the correct details of the `options` block as it is heavily dependent
     on the Operating System used. Please dont forget to adjust as required.
    

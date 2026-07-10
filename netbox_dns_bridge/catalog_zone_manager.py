@@ -181,18 +181,12 @@ def _create_soa_rdataset() -> dns.rdataset:
         ttl = 0
         rclass = dns.rdataclass.IN
         rtype = dns.rdatatype.SOA
-        mname = dns.name.from_text("invalid", dns.name.root)
-        rname = dns.name.from_text("invalid", dns.name.root)
-        refresh = 60
-        retry = 10
-        expire = 1209600
-        minimum = 0
 
         # Create SOA rdata object
         rdata = dns.rdata.from_text(
             rclass,
             rtype,
-            f"{mname} {rname} {serial} {refresh} {retry} {expire} {minimum}",
+            f"invalid. invalid. {serial} 60 10 1209600 0",
         )
 
         # Create Rdataset and add the RDATA to it

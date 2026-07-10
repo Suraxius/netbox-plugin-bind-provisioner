@@ -70,6 +70,7 @@ class SendDNSNotify(JobRunner):
             )
 
             for zone_name, soa_serial in zones:
+                zone_name = dns.name.from_text(zone_name, dns.name.root).to_text()
                 msg = dns.message.make_query(zone_name, dns.rdatatype.SOA)
                 msg.flags = 0
                 msg.set_opcode(dns.opcode.NOTIFY)
@@ -77,10 +78,10 @@ class SendDNSNotify(JobRunner):
                 soa_rdata = dns.rdata.from_text(
                     dns.rdataclass.IN,
                     dns.rdatatype.SOA,
-                    f"invalid invalid {soa_serial} 60 10 1209600 0",
+                    f"invalid. invalid. {soa_serial} 60 10 1209600 0",
                 )
                 soa_rrset = dns.rrset.from_rdata(
-                    dns.name.from_text(zone_name, dns.name.root), 0, soa_rdata
+                    zone_name, 0, soa_rdata
                 )
                 msg.authority.append(soa_rrset)
                 msg.use_tsig(keyring={tsig_key.name: tsig_key}, keyname=tsig_key.name)
@@ -88,18 +89,19 @@ class SendDNSNotify(JobRunner):
                 for client in clients:
                     try:
                         if notify_over_tcp:
-                            LOGGER.info("Sending over TCP")
-                            dns.query.tcp(msg, client.source_ip, timeout=2)
+                            LOGGER.debug("Sending NOTIFY over TCP")
+                            dns.query.tcp(msg, client.source_ip, port=5355, timeout=2)
                         else:
-                            LOGGER.info("Sending over UDP")
-                            dns.query.udp(msg, client.source_ip, timeout=2)
+                            LOGGER.debug("Sending NOTIFY over UDP")
+                            dns.query.udp(msg, client.source_ip, port=5355, timeout=2)
 
                         LOGGER.info(
-                            f"NOTIFY sent to {client.source_ip} for zone {zone_name}"
+                            f"NOTIFY sent: {client.source_ip} {view_name}/{zone_name} {soa_serial}"
                         )
                     except Exception as e:
                         LOGGER.error(
-                            f"NOTIFY failed for {client.source_ip} zone {zone_name}: {e}"
+                            f"NOTIFY failed: {client.source_ip}"
+                            f" {view_name}/{zone_name} {soa_serial}: {e}"
                         )
 
         except IntegerKeyValueSetting.DoesNotExist as e:

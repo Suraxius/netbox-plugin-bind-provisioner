@@ -4,7 +4,7 @@ from .logger import get_logger
 
 __version__ = "1.5.4"
 
-logger = get_logger(__name__)
+LOGGER = get_logger(__name__)
 
 
 class DNSBridgeConfig(PluginConfig):

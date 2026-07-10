@@ -91,6 +91,10 @@ notify_client_alive_threshold_hours: 24
 This sets how long a client is considred "alive" after it last queried the transfer endpoint. 
 Once the client has failed to check in for this amout of time, it is automatically removed from the
 list of clients to be notified on zone changes. Default is 24 hours.
+```
+notify_over_tcp: True
+```
+Switch to using TCP instead of UDP. Default: False
 
 ## Plugin compatibility
 This plugin extends the netbox-plugin-dns plugin. As such the versioning was changed to match the

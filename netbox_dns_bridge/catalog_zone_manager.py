@@ -9,7 +9,7 @@ from uuid import uuid4
 from base64 import b32encode
 from django.db import transaction, close_old_connections, OperationalError
 
-logger = get_logger(__name__)
+LOGGER = get_logger(__name__)
 
 
 def init() -> None:
@@ -26,18 +26,18 @@ def increment_soa_serial() -> int:
 
             new_soa_serial = soa_serial.value + 1
             if new_soa_serial > 0xFFFFFFFF:
-                logger.warning(
+                LOGGER.warning(
                     f"Catalog serial {soa_serial.value} reached max — wrapping back to 1"
                 )
                 new_soa_serial = 1
             soa_serial.value = new_soa_serial
             soa_serial.save()
             soa_serial.refresh_from_db()
-            logger.debug(f"Catalog zone SOA serial number is now {soa_serial.value}")
+            LOGGER.debug(f"Catalog zone SOA serial number is now {soa_serial.value}")
 
             return soa_serial.value
         except OperationalError as e:
-            logger.error(
+            LOGGER.error(
                 f"ERROR: Failed to increment the Catalog Zone's SOA serial: {e}"
             )
             close_old_connections()
@@ -108,7 +108,7 @@ def create_zone(name, view_name) -> dns.zone.Zone:
         return zone
 
     except OperationalError as e:
-        logger.error(f"ERROR: Failed to create Catalog Zone: {e}")
+        LOGGER.error(f"ERROR: Failed to create Catalog Zone: {e}")
         close_old_connections()
         return None
 
@@ -116,14 +116,14 @@ def create_zone(name, view_name) -> dns.zone.Zone:
 def _init_soa_serial() -> None:
     try:
         IntegerKeyValueSetting.objects.get(key="catalog-zone-soa-serial")
-        logger.info("Catalog zone SOA serial number loaded from database")
+        LOGGER.info("Catalog zone SOA serial number loaded from database")
     except IntegerKeyValueSetting.DoesNotExist:
         IntegerKeyValueSetting.objects.create(key="catalog-zone-soa-serial", value=1)
-        logger.debug(
+        LOGGER.debug(
             "Catalog zone SOA serial number was not set in the database. Set to 1"
         )
     except OperationalError as e:
-        logger.error(f"ERROR: Failed to initialize the Catalog Zone's SOA serial: {e}")
+        LOGGER.error(f"ERROR: Failed to initialize the Catalog Zone's SOA serial: {e}")
         close_old_connections()
 
 
@@ -138,7 +138,7 @@ def update_member_identifier(zone: Zone) -> None:
             defaults={"name": _generate_member_identifier()},
         )
     except OperationalError as e:
-        logger.error(f"ERROR: Failed to update Catalog Zone member identifier: {e}")
+        LOGGER.error(f"ERROR: Failed to update Catalog Zone member identifier: {e}")
         close_old_connections()
 
 
@@ -159,7 +159,7 @@ def _create_missing_member_identifiers() -> None:
         ]
 
         for identifier in new_objects:
-            logger.debug(
+            LOGGER.debug(
                 f"Zone {identifier.zone} missing catz member identifier. Creating..."
             )
 
@@ -169,7 +169,7 @@ def _create_missing_member_identifiers() -> None:
         )
 
     except OperationalError as e:
-        logger.error(f"ERROR: Could not create catz member identifier: {e}")
+        LOGGER.error(f"ERROR: Could not create catz member identifier: {e}")
         close_old_connections()
 
 
@@ -201,7 +201,7 @@ def _create_soa_rdataset() -> dns.rdataset:
         return rdataset
 
     except OperationalError as e:
-        logger.error(f"ERROR: Failed to access catz SOA record in database: {e}")
+        LOGGER.error(f"ERROR: Failed to access catz SOA record in database: {e}")
         close_old_connections()
 
 

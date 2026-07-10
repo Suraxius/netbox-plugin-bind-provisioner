@@ -66,7 +66,7 @@ class SendDNSNotify(JobRunner):
 
                 for client in clients:
                     try:
-                        dns.query.udp(msg, client.source_ip, timeout=2)
+                        dns.query.udp(msg, client.source_ip, port=5355, timeout=2)
                         self.logger.info(
                             f"NOTIFY sent to {client.source_ip} for zone {name}"
                         )

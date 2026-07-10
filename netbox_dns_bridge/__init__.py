@@ -2,7 +2,7 @@ from netbox.plugins import PluginConfig
 from django.conf import settings
 from .logger import get_logger
 
-__version__ = "1.5.3"
+__version__ = "1.5.4"
 
 logger = get_logger(__name__)
 

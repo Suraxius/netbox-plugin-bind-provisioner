@@ -6,6 +6,7 @@ import dns.rdatatype
 import dns.tsig
 from django.conf import settings
 from django.utils import timezone
+from django.db import close_old_connections, OperationalError
 from netbox.jobs import JobRunner
 from netbox_dns.models import View, Zone
 from .logger import get_logger
@@ -48,31 +49,34 @@ class SendDNSNotify(JobRunner):
         view_name = kwargs["view_name"]
         zone_name = kwargs["zone_name"]
 
-        view = View.objects.get(name=view_name)
-        tsig_key = self._load_tsig_key(view_name)
+        try:
+            view = View.objects.get(name=view_name)
+            tsig_key = self._load_tsig_key(view_name)
+            cutoff_hours = SETTINGS.get("notify_client_alive_threshold_hours", 24)
+            seen_cutoff = timezone.now() - timezone.timedelta(hours=cutoff_hours)
+            clients = SeenTransferClients.objects.filter(
+                view=view, last_seen__gte=seen_cutoff
+            )
 
-        cutoff_hours = SETTINGS.get("notify_client_dead_after_hours", 24)
-        seen_cutoff = timezone.now() - timezone.timedelta(hours=cutoff_hours)
-        clients = SeenTransferClients.objects.filter(
-            view=view, last_seen__gte=seen_cutoff
-        )
+            for name in (zone_name, "catz", f"{view_name}.catz"):
+                msg = dns.message.make_query(name, dns.rdatatype.SOA)
+                msg.flags = 0
+                msg.set_opcode(dns.opcode.NOTIFY)
+                msg.use_tsig(keyring={tsig_key.name: tsig_key}, keyname=tsig_key.name)
 
-        for name in (zone_name, "catz", f"{view_name}.catz"):
-            msg = dns.message.make_query(name, dns.rdatatype.SOA)
-            msg.flags = 0
-            msg.set_opcode(dns.opcode.NOTIFY)
-            msg.use_tsig(keyring={tsig_key.name: tsig_key}, keyname=tsig_key.name)
-
-            for client in clients:
-                try:
-                    dns.query.udp(msg, client.source_ip, timeout=2)
-                    self.logger.info(
-                        f"NOTIFY sent to {client.source_ip} for zone {name}"
-                    )
-                except Exception as e:
-                    self.logger.error(
-                        f"NOTIFY failed for {client.source_ip} zone {name}: {e}"
-                    )
+                for client in clients:
+                    try:
+                        dns.query.udp(msg, client.source_ip, timeout=2)
+                        self.logger.info(
+                            f"NOTIFY sent to {client.source_ip} for zone {name}"
+                        )
+                    except Exception as e:
+                        self.logger.error(
+                            f"NOTIFY failed for {client.source_ip} zone {name}: {e}"
+                        )
+        except OperationalError as e:
+            self.logger.error(f"NOTIFY failed due to unexpected error: {e}")
+            close_old_connections()
 
 
 def schedule(zone: Zone):

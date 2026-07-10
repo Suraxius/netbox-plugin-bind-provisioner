@@ -9,36 +9,24 @@ import dns.rdataclass
 import dns.rdtypes
 import dns.exception
 import dns.renderer
-import logging
 
 from django.core.management.base import BaseCommand
 from django.conf import settings
+from django.db import close_old_connections, OperationalError
 from netbox_dns.models import View
 from netbox_dns_bridge import catalog_zone_manager as catzm
 from netbox_dns_bridge.request_handler import UDPRequestHandler, TCPRequestHandler
 from netbox_dns_bridge.dns_server import UDPDNSServer, TCPDNSServer
-from netbox_dns_bridge.models import IntegerKeyValueSetting
 from netbox_dns_bridge.logger import get_logger
 
-logger = get_logger(__name__)
+LOGGER = get_logger(__name__)
+SETTINGS = settings.PLUGINS_CONFIG.get("netbox_dns_bridge", {})
 
 
 class Command(BaseCommand):
     help = "Run a minimal AXFR DNS server using data from NetBox DNS plugin"
 
-    def load_settings(self):
-        self.settings = settings.PLUGINS_CONFIG.get("netbox_dns_bridge", None)
-        if not self.settings:
-            raise RuntimeError(
-                "Command failed to initialize due to missing settings. Terminating Netbox."
-            )
-
-        self.tsig_keys = self.settings.get("tsig_keys", None)
-        if not self.tsig_keys:
-            raise RuntimeError("tsig_keys variable not set in plugin settings.")
-
-    # Load TSIG keys and map them to views
-    def load_tsig_key_settings(self):
+    def _load_tsig_key_settings(self):
         self.keyring = {}
         self.tsig_view_map = {}
 
@@ -48,7 +36,7 @@ class Command(BaseCommand):
             algorithm_str = data.get("algorithm", "hmac-sha256")
 
             if not raw_key_name or not secret:
-                logger.error(
+                LOGGER.error(
                     f"Skipping TSIG key for view {view_name}: missing keyname or secret."
                 )
                 continue
@@ -56,10 +44,12 @@ class Command(BaseCommand):
             try:
                 nb_view = View.objects.get(name=view_name)
             except View.DoesNotExist:
-                logger.error(
+                LOGGER.error(
                     f"Skipping TSIG key {raw_key_name}: view '{view_name}' not found."
                 )
                 continue
+            except OperationalError:
+                close_old_connections()
 
             # Normalize key name to absolute DNS name
             key_name_obj = dns.name.from_text(raw_key_name, origin=None).canonicalize()
@@ -71,11 +61,11 @@ class Command(BaseCommand):
                 name=key_name_obj, secret=secret, algorithm=algorithm_str
             )
             self.tsig_view_map[key_name_str] = nb_view
-            logger.info(f"Loaded TSIG key {key_name_str} for view {nb_view.name}")
+            LOGGER.info(f"Loaded TSIG key {key_name_str} for view {nb_view.name}")
 
         if not self.keyring:
             msg = "No TSIG keys found in database."
-            logger.critical(msg)
+            LOGGER.critical(msg)
             raise RuntimeError(msg)
 
     def add_arguments(self, parser):
@@ -92,9 +82,11 @@ class Command(BaseCommand):
         address = options["address"]
         catzm.init()
 
-        # Initialize settings
-        self.load_settings()
-        self.load_tsig_key_settings()
+        self.tsig_keys = SETTINGS.get("tsig_keys", None)
+        if not self.tsig_keys:
+            raise RuntimeError("tsig_keys variable not set in plugin settings.")
+
+        self._load_tsig_key_settings()
 
         udp_server = UDPDNSServer(
             (address, port), UDPRequestHandler, self.keyring, self.tsig_view_map
@@ -104,15 +96,15 @@ class Command(BaseCommand):
             (address, port), TCPRequestHandler, self.keyring, self.tsig_view_map
         )
 
-        def run_udp_server(server):
-            logger.info(f"Query endpoint listening on {address} udp/{port}")
+        def _run_udp_server(server):
+            LOGGER.info(f"Query endpoint listening on {address} udp/{port}")
             server.serve_forever()
 
         udp_thread = threading.Thread(
-            target=run_udp_server, args=(udp_server,), daemon=True
+            target=_run_udp_server, args=(udp_server,), daemon=True
         )
 
         udp_thread.start()
 
-        logger.info(f"Query endpoint listening on {address} tcp/{port}")
+        LOGGER.info(f"Query endpoint listening on {address} tcp/{port}")
         tcp_server.serve_forever()

@@ -1,8 +1,3 @@
-import os
-import dns.zone
-import dns.rdatatype
-import dns.rdataclass
-import dns.exception
 import netbox_dns.models
 from netbox_dns_bridge.utils import export_bind_zone_file
 from django.core.management.base import BaseCommand, CommandError
@@ -24,10 +19,6 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
-        # if len(options) < 2:
-        #    print("export-zone <zone name> <file path>")
-        #    sys.exit(1)
-
         # Load parameters
         view_name = options["view"]
         zone_name = options["zone"]
@@ -48,13 +39,11 @@ class Command(BaseCommand):
 
             if nb_zone:
                 export_bind_zone_file(nb_zone, file_path=file_path)
+                self.stdout.write(
+                    self.style.SUCCESS(f"Zone '{zone_name}' exported to '{file_path}'")
+                )
             else:
-                print("Zone not found in Netbox. Aborting")
-                sys.exit(1)
+                self.stderr.write("Zone not found in Netbox. Aborting")
 
         except Exception as e:
             raise CommandError(f"Failed to export zone: {e}")
-
-        self.stdout.write(
-            self.style.SUCCESS(f"Zone '{zone_name}' exported to '{file_path}'")
-        )

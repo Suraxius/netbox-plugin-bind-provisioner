@@ -12,12 +12,15 @@ import dns.exception
 import dns.renderer
 from .logger import get_logger
 from django.utils import timezone
+from django.db import close_old_connections, OperationalError
+from django.conf import settings
 from netbox_dns.models import Zone, Record, View
 from netbox_dns_bridge import catalog_zone_manager as catzm
 from .models import SeenTransferClients
 
-logger = get_logger(__name__)
+LOGGER = get_logger(__name__)
 SETTINGS = settings.PLUGINS_CONFIG["netbox_dns_bridge"]
+
 
 class DNSBaseRequestHandler(socketserver.BaseRequestHandler):
     def __init__(self, request, client_address, server) -> None:
@@ -34,87 +37,88 @@ class DNSBaseRequestHandler(socketserver.BaseRequestHandler):
                 view__name=view_name,
                 active=True,
             )
-        except Zone.DoesNotExist:
-            return None
+            # Build DNS zone
+            zone = dns.zone.Zone(zone_name, dns.name.root)
+            zone.rdclass = dns.rdataclass.IN
 
-        # Build DNS zone
-        zone = dns.zone.Zone(zone_name, dns.name.root)
-        zone.rdclass = dns.rdataclass.IN
+            nb_records = Record.objects.filter(zone=nb_zone, active=True)
 
-        nb_records = Record.objects.filter(
-            zone=nb_zone, active=True
-        )
+            rdatasets_dict = {}
 
-        rdatasets_dict = {}
-
-        for record in nb_records:
-            rdtype = dns.rdatatype.from_text(record.type)
-            if not record.name:
-                name = zone.origin
-            elif record.name.endswith("."):
-                name = dns.name.from_text(record.name)
-            else:
-                name = dns.name.from_text(record.name, origin=zone.origin)
-
-            # If the record has no TTL, use the zone default
-            ttl = record.ttl or nb_zone.default_ttl
-
-            # Apply quoting for TXT records to stop tokanizer
-            # from cutting it up:
-            value = record.value
-            if rdtype == dns.rdatatype.TXT:
-                if value.startswith('"') and value.endswith('"'):
-                    value = value[1:-1].replace('" "', "").replace('"', '"')
-
-                if len(value) > 255:
-                    # This is a bug fix for netbox. If netbox allowed for
-                    # an unquoted value to be larger then 255 characters,
-                    # it misunderstood everything behind a ; as a comment.
-                    chunks = [
-                        '"{}"'.format(value[i : i + 255])
-                        for i in range(0, len(value), 255)
-                    ]
-                    value = " ".join(chunks)
+            for record in nb_records:
+                rdtype = dns.rdatatype.from_text(record.type)
+                if not record.name:
+                    name = zone.origin
+                elif record.name.endswith("."):
+                    name = dns.name.from_text(record.name)
                 else:
-                    value = f'"{value}"'
+                    name = dns.name.from_text(record.name, origin=zone.origin)
 
-            rdata = dns.rdata.from_text(
-                dns.rdataclass.IN,
-                rdtype,
-                value,
-                relativize=False,
-                origin=zone.origin,
-            )
+                # If the record has no TTL, use the zone default
+                ttl = record.ttl or nb_zone.default_ttl
 
-            # Initialize rdataset if it doesn't exist for this name and type
-            if name not in rdatasets_dict:
-                rdatasets_dict[name] = {}
-            if rdtype not in rdatasets_dict[name]:
-                rdatasets_dict[name][rdtype] = dns.rdataset.Rdataset(
-                    dns.rdataclass.IN, rdtype
+                # Apply quoting for TXT records to stop tokanizer
+                # from cutting it up:
+                value = record.value
+                if rdtype == dns.rdatatype.TXT:
+                    if value.startswith('"') and value.endswith('"'):
+                        value = value[1:-1].replace('" "', "").replace('"', '"')
+
+                    if len(value) > 255:
+                        # This is a bug fix for netbox. If netbox allowed for
+                        # an unquoted value to be larger then 255 characters,
+                        # it misunderstood everything behind a ; as a comment.
+                        chunks = [
+                            '"{}"'.format(value[i : i + 255])
+                            for i in range(0, len(value), 255)
+                        ]
+                        value = " ".join(chunks)
+                    else:
+                        value = f'"{value}"'
+
+                rdata = dns.rdata.from_text(
+                    dns.rdataclass.IN,
+                    rdtype,
+                    value,
+                    relativize=False,
+                    origin=zone.origin,
                 )
 
-            # Add the rdata to the appropriate rdataset
-            rdatasets_dict[name][rdtype].add(rdata, ttl)
-
-        # Now, add all rdatasets to the zone
-        for name, rdtypes in rdatasets_dict.items():
-            for rdtype, rdataset in rdtypes.items():
-                # Ensure rdataset has the same rdclass as the zone
-                if rdataset.rdclass != zone.rdclass:
-                    raise ValueError(
-                        f"rdataset rdclass {rdataset.rdclass} does not match "
-                        f"zone rdclass {zone.rdclass}"
+                # Initialize rdataset if it doesn't exist for this name and type
+                if name not in rdatasets_dict:
+                    rdatasets_dict[name] = {}
+                if rdtype not in rdatasets_dict[name]:
+                    rdatasets_dict[name][rdtype] = dns.rdataset.Rdataset(
+                        dns.rdataclass.IN, rdtype
                     )
 
-                # Check if the rdataset has any rdata before creating an RRset
-                if not rdataset:
-                    logger.debug(f"Skipping empty rdataset for {name} {rdtype}")
-                    continue  # Skip empty rdataset
+                # Add the rdata to the appropriate rdataset
+                rdatasets_dict[name][rdtype].add(rdata, ttl)
 
-                # Replace the rdataset for the given name and type
-                zone.replace_rdataset(name, rdataset)
-        return zone
+            # Now, add all rdatasets to the zone
+            for name, rdtypes in rdatasets_dict.items():
+                for rdtype, rdataset in rdtypes.items():
+                    # Ensure rdataset has the same rdclass as the zone
+                    if rdataset.rdclass != zone.rdclass:
+                        raise ValueError(
+                            f"rdataset rdclass {rdataset.rdclass} does not match "
+                            f"zone rdclass {zone.rdclass}"
+                        )
+
+                    # Check if the rdataset has any rdata before creating an RRset
+                    if not rdataset:
+                        LOGGER.debug(f"Skipping empty rdataset for {name} {rdtype}")
+                        continue  # Skip empty rdataset
+
+                    # Replace the rdataset for the given name and type
+                    zone.replace_rdataset(name, rdataset)
+            return zone
+
+        except Zone.DoesNotExist:
+            return None
+        except OperationalError as e:
+            LOGGER.error(f"DB ERROR: {e}")
+            close_old_connections()
 
     def _deny_request_bad_tsig(self, wire, tsig_error: dns.rcode) -> None:
         # Use empty keyring to parse TSIG without validating
@@ -146,11 +150,16 @@ class DNSBaseRequestHandler(socketserver.BaseRequestHandler):
 
     def _track_seen_client(self, source_ip: str, view: View) -> None:
         if SETTINGS.get("notify_clients", False):
-            SeenTransferClients.objects.update_or_create(
-                source_ip=source_ip,
-                view=view,
-                defaults={"last_seen": timezone.now()},
-            )
+            try:
+                SeenTransferClients.objects.update_or_create(
+                    source_ip=source_ip,
+                    view=view,
+                    defaults={"last_seen": timezone.now()},
+                )
+
+            except OperationalError as e:
+                LOGGER.error(f"DB ERROR: {e}")
+                close_old_connections()
 
     def _handle_soa_request(self, query, soa_rrset, zone, peer, nb_view, dname) -> None:
         # We assume that the SOA rdataset has at least one record (it usually does).
@@ -185,11 +194,11 @@ class DNSBaseRequestHandler(socketserver.BaseRequestHandler):
 
         data = response.to_wire(max_size=512)
         self._send_response(data)
-        logger.info(f"{peer} SOA {nb_view.name}/{dname}")
+        LOGGER.info(f"{peer} SOA {nb_view.name}/{dname}")
 
     def _handle_axfr_request(self, query, zone, peer, nb_view, dname) -> None:
         if query.keyname not in self.server.keyring:
-            logger.error(f"AXFR aborted: keyname {query.keyname} not in keyring")
+            LOGGER.error(f"AXFR aborted: keyname {query.keyname} not in keyring")
             self._deny_request(query)
             return
 
@@ -262,7 +271,7 @@ class DNSBaseRequestHandler(socketserver.BaseRequestHandler):
                 try:
                     r.add_rrset(dns.renderer.ANSWER, rrset)
                 except dns.exception.TooBig:
-                    logger.error(
+                    LOGGER.error(
                         f"RRset {rrset.name}/{dns.rdatatype.to_text(rrset.rdtype)} "
                         f"exceeds MAX_WIRE ({self.MAX_WIRE}) and cannot be sent; "
                         f"skipping."
@@ -283,7 +292,7 @@ class DNSBaseRequestHandler(socketserver.BaseRequestHandler):
         )
         wire = r.get_wire()
         self._send_response(wire)
-        logger.info(f"{peer} AXFR {nb_view.name}/{dname}")
+        LOGGER.info(f"{peer} AXFR {nb_view.name}/{dname}")
 
     def _handle_dns_query(self, wire) -> None:
         peer = self.client_address[0]
@@ -296,17 +305,17 @@ class DNSBaseRequestHandler(socketserver.BaseRequestHandler):
             )
 
         except dns.tsig.BadSignature as e:
-            logger.warning(f"Request denied from {peer} failed TSIG verification: {e}")
+            LOGGER.warning(f"Request denied from {peer} failed TSIG verification: {e}")
             self._deny_request_bad_tsig(wire, dns.rcode.BADSIG)
             return
 
         except (dns.message.UnknownTSIGKey, dns.tsig.BadAlgorithm) as e:
-            logger.warning(f"Request denied from {peer} with bad TSIG key: {e}")
+            LOGGER.warning(f"Request denied from {peer} with bad TSIG key: {e}")
             self._deny_request_bad_tsig(wire, dns.rcode.BADKEY)
             return
 
         except Exception as e:
-            logger.error("Error parsing query: ", e)
+            LOGGER.error("Error parsing query: ", e)
             return
 
         # If there was no question in the query, refuse
@@ -321,7 +330,7 @@ class DNSBaseRequestHandler(socketserver.BaseRequestHandler):
 
         # Only process AXFR/SOA queris
         if qtype not in (dns.rdatatype.AXFR, dns.rdatatype.SOA):
-            logger.warning(
+            LOGGER.warning(
                 f"Request denied from {peer}: Request was not AXFR or SOA (Type: {qtype})"
             )
             self._deny_request(query)
@@ -329,7 +338,7 @@ class DNSBaseRequestHandler(socketserver.BaseRequestHandler):
 
         # Identify TSIG key used
         if not query.had_tsig:
-            logger.warning(f"Request denied from {peer}: No TSIG key used")
+            LOGGER.warning(f"Request denied from {peer}: No TSIG key used")
             self._deny_request(query)
             return
 
@@ -338,7 +347,7 @@ class DNSBaseRequestHandler(socketserver.BaseRequestHandler):
         # Check if the key matches a view
         nb_view = self.server.tsig_view_map.get(key_name)
         if not nb_view:
-            logger.warning(
+            LOGGER.warning(
                 f"Request denied from {peer}: {key_name} does not match a view"
             )
             self._deny_request(query)
@@ -351,14 +360,14 @@ class DNSBaseRequestHandler(socketserver.BaseRequestHandler):
             zone = self._getZoneFromNB(dname, nb_view.name)
         # When zone was not found, let client know
         if not zone:
-            logger.warning(f"Zone {dname} not found in view {nb_view.name}")
+            LOGGER.warning(f"Zone {dname} not found in view {nb_view.name}")
             self._deny_request(query)
             return
 
         # Retrieve the existing SOA record from the Zone
         soa_rrset = zone.get_rdataset(zone.origin, dns.rdatatype.SOA)
         if soa_rrset is None:
-            logger.error(f"Zone {dname} has no SOA — aborting")
+            LOGGER.error(f"Zone {dname} has no SOA — aborting")
             return
 
         if qtype == dns.rdatatype.SOA:
@@ -383,7 +392,7 @@ class UDPRequestHandler(DNSBaseRequestHandler):
         try:
             self._handle_dns_query(data)
         except Exception as e:
-            logger.error(f"Error handling request from {peer}: {e}")
+            LOGGER.error(f"Error handling request from {peer}: {e}")
             import traceback
 
             traceback.print_exc()
@@ -425,9 +434,9 @@ class TCPRequestHandler(DNSBaseRequestHandler):
                 self._handle_dns_query(wire)
 
         except socket.timeout:
-            logger.debug(f"Connection from {peer} timed out")
+            LOGGER.debug(f"Connection from {peer} timed out")
         except Exception as e:
-            logger.error(f"Error handling request from {peer}: {e}")
+            LOGGER.error(f"Error handling request from {peer}: {e}")
             import traceback
 
             traceback.print_exc()

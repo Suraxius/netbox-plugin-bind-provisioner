@@ -72,7 +72,7 @@ class SendDNSNotify(JobRunner):
             for zone_name, soa_serial in zones:
                 zone_name = dns.name.from_text(zone_name, dns.name.root).to_text()
                 msg = dns.message.make_query(zone_name, dns.rdatatype.SOA)
-                msg.flags = 0
+                msg.flags |= dns.flags.AA # = 0
                 msg.set_opcode(dns.opcode.NOTIFY)
 
                 soa_rdata = dns.rdata.from_text(

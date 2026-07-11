@@ -74,27 +74,29 @@ multiple views yields unpredicted behavior.
 #### NOTIFY
 Clients may be notified of zone changes using the NOTIFY mechanism defined in RFC 1996.
 When enabled, the zone transfer endpoint keeps track of any client that successfully queried the
-endpoint and when a zone changes. Once a zone has changed, NetBox informs each client of change.
+endpoint and when a zone changes. Once a zone has changed, NetBox informs each client of said
+change.
 
 Note that this feature uses NetBox's background job system to schedule the messages asynchronously.
 In order to work, you need at least one `rq-worker` service running in the background to handle
-the queried jobs.
+the queued jobs.
 
-To enable the NOTIFY feature, set following:
+##### NOTIFY Settings
 ```
 'notify_clients': True
 ```
-##### NOTIFY Settings
+This enables the NOTIFY system. Defaults to False
+
 ```
-notify_client_alive_threshold_hours: 24
+'notify_client_alive_threshold_hours': 24
 ```
 This sets how long a client is considred "alive" after it last queried the transfer endpoint. 
 Once the client has failed to check in for this amout of time, it is automatically removed from the
 list of clients to be notified on zone changes. Default is 24 hours.
 ```
-notify_over_tcp: True
+'notify_over_tcp': True
 ```
-Switch to using TCP instead of UDP. Default: False
+Switch to using TCP instead of UDP. Defaults to False
 
 ## Plugin compatibility
 This plugin extends the netbox-plugin-dns plugin. As such the versioning was changed to match the

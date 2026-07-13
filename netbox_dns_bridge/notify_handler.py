@@ -52,12 +52,14 @@ class SendDNSNotify(JobRunner):
         view_name = kwargs["view_name"]
 
         try:
-            catz_serial = IntegerKeyValueSetting.objects.get(key="catalog-zone-soa-serial").value
+            catz_serial = IntegerKeyValueSetting.objects.get(
+                key="catalog-zone-soa-serial"
+            ).value
 
             zones = [
                 (kwargs["zone_name"], kwargs["soa_serial"]),
-                ("catz",              catz_serial),
-                (f"{view_name}.catz", catz_serial)
+                ("catz", catz_serial),
+                (f"{view_name}.catz", catz_serial),
             ]
 
             view = View.objects.get(name=view_name)
@@ -72,7 +74,7 @@ class SendDNSNotify(JobRunner):
             for zone_name, soa_serial in zones:
                 zone_name = dns.name.from_text(zone_name, dns.name.root).to_text()
                 msg = dns.message.make_query(zone_name, dns.rdatatype.SOA)
-                msg.flags |= dns.flags.AA # = 0
+                msg.flags |= dns.flags.AA  # = 0
                 msg.set_opcode(dns.opcode.NOTIFY)
 
                 soa_rdata = dns.rdata.from_text(
@@ -80,9 +82,7 @@ class SendDNSNotify(JobRunner):
                     dns.rdatatype.SOA,
                     f"invalid. invalid. {soa_serial} 60 10 1209600 0",
                 )
-                soa_rrset = dns.rrset.from_rdata(
-                    zone_name, 0, soa_rdata
-                )
+                soa_rrset = dns.rrset.from_rdata(zone_name, 0, soa_rdata)
                 msg.authority.append(soa_rrset)
                 msg.use_tsig(keyring={tsig_key.name: tsig_key}, keyname=tsig_key.name)
 
@@ -114,13 +114,9 @@ class SendDNSNotify(JobRunner):
 
 def schedule(zone: Zone):
     try:
-        soa_record = Record.objects.filter(
-            zone=zone, type="SOA", active=True
-        ).first()
+        soa_record = Record.objects.filter(zone=zone, type="SOA", active=True).first()
         if soa_record is None:
-            LOGGER.error(
-                f"Zone {zone.name} has no active SOA record — skipping NOTIFY"
-            )
+            LOGGER.error(f"Zone {zone.name} has no active SOA record — skipping NOTIFY")
             return
 
         soa_serial = int(soa_record.value.split()[2])
@@ -130,9 +126,7 @@ def schedule(zone: Zone):
         close_old_connections()
         return
     except (ValueError, IndexError) as e:
-        LOGGER.error(
-            f"Failed to parse SOA serial for zone {zone.name}: {e}"
-        )
+        LOGGER.error(f"Failed to parse SOA serial for zone {zone.name}: {e}")
         return
 
     SendDNSNotify.enqueue(

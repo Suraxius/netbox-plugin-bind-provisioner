@@ -27,13 +27,15 @@ def zone_post_save(sender, instance, created, **kwargs):
     zone = instance
 
     # Quit if this is not the first signal in this session for this zone.
-    request = current_request.get()
-    if request is not None:
+    try:
+        request = current_request.get()
         handled_zones = getattr(request, "_handled_zones", set())
         if zone.pk in handled_zones:
             return
         handled_zones.add(zone.pk)
         request._handled_zones = handled_zones
+    except LookupError:
+        pass
 
     # On commit, increment soa serial and if notify is enabled, schedule bg job.
     def _on_commit():
@@ -52,6 +54,7 @@ def zone_post_save(sender, instance, created, **kwargs):
         old_name = getattr(zone, "_old_name", None)
         if old_name and zone.name != old_name:
             catzm.update_member_identifier(zone)
+
 
 @receiver(post_delete, sender=Zone)
 def zone_post_delete(sender, instance, **kwargs):

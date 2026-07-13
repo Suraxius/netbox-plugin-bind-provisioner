@@ -215,6 +215,10 @@ class DNSBaseRequestHandler(socketserver.BaseRequestHandler):
             else:
                 rrsets.append(rrset)
 
+        if soa_rrset is None:
+            LOGGER.error(f"Zone {dname} has no SOA — aborting")
+            return
+
         rrsets.insert(0, soa_rrset)  # Opening SOA
         rrsets.append(soa_rrset)  # Closing SOA
 

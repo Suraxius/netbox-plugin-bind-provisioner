@@ -14,7 +14,6 @@ from django.core.management.base import BaseCommand
 from django.conf import settings
 from django.db import close_old_connections, OperationalError
 from netbox_dns.models import View
-from netbox_dns_bridge import catalog_zone_manager as catzm
 from netbox_dns_bridge.request_handler import UDPRequestHandler, TCPRequestHandler
 from netbox_dns_bridge.dns_server import UDPDNSServer, TCPDNSServer
 from netbox_dns_bridge.logger import get_logger
@@ -80,7 +79,6 @@ class Command(BaseCommand):
         # Load parameters
         port = options["port"]
         address = options["address"]
-        catzm.init()
 
         self.tsig_keys = SETTINGS.get("tsig_keys", None)
         if not self.tsig_keys:

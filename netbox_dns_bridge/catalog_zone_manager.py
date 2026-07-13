@@ -7,35 +7,40 @@ from netbox_dns.models import Zone
 from netbox_dns_bridge.models import IntegerKeyValueSetting, CatalogZoneMemberIdentifier
 from uuid import uuid4
 from base64 import b32encode
-from django.db import transaction, close_old_connections, OperationalError
+from django.db import (
+    transaction,
+    close_old_connections,
+    OperationalError,
+    RelatedObjectDoesNotExist
+)
 
 LOGGER = get_logger(__name__)
-
-
-def init() -> None:
-    _init_soa_serial()
-    _create_missing_member_identifiers()
 
 
 def increment_soa_serial() -> int:
     with transaction.atomic():
         try:
-            soa_serial = IntegerKeyValueSetting.objects.select_for_update().get(
-                key="catalog-zone-soa-serial"
+            soa_serial_obj = (
+                IntegerKeyValueSetting.objects.select_for_update().get_or_create(
+                    key="catalog-zone-soa-serial",
+                    defaults={"value": 1},
+                )
             )
 
-            new_soa_serial = soa_serial.value + 1
+            new_soa_serial = soa_serial_obj.value + 1
             if new_soa_serial > 0xFFFFFFFF:
                 LOGGER.warning(
-                    f"Catalog serial {soa_serial.value} reached max — wrapping back to 1"
+                    f"Catalog serial {soa_serial_obj.value} reached max — wrapping back to 1"
                 )
                 new_soa_serial = 1
-            soa_serial.value = new_soa_serial
-            soa_serial.save()
-            soa_serial.refresh_from_db()
-            LOGGER.debug(f"Catalog zone SOA serial number is now {soa_serial.value}")
+            soa_serial_obj.value = new_soa_serial
+            soa_serial_obj.save()
+            soa_serial_obj.refresh_from_db()
+            LOGGER.debug(
+                f"Catalog zone SOA serial number is now {soa_serial_obj.value}"
+            )
 
-            return soa_serial.value
+            return soa_serial_obj.value
         except OperationalError as e:
             LOGGER.error(
                 f"ERROR: Failed to increment the Catalog Zone's SOA serial: {e}"
@@ -64,7 +69,14 @@ def create_zone(name, view_name) -> dns.zone.Zone:
             qname = dns.name.from_text(nb_zone.name, dns.name.root)
 
             # Create PTR record
-            p_name = nb_zone.catz_identifier.name
+            try:
+                catz_identifier = nb_zone.catz_identifier
+            except RelatedObjectDoesNotExist:
+                catz_identifier = nb_zone.catz_identifier.create(
+                    name=_generate_member_identifier()
+                )
+
+            p_name = catz_identifier.name
 
             ptr_name = dns.name.from_text(p_name, ptr_base)
             if not ptr_name.is_subdomain(origin):
@@ -113,20 +125,6 @@ def create_zone(name, view_name) -> dns.zone.Zone:
         return None
 
 
-def _init_soa_serial() -> None:
-    try:
-        IntegerKeyValueSetting.objects.get(key="catalog-zone-soa-serial")
-        LOGGER.info("Catalog zone SOA serial number loaded from database")
-    except IntegerKeyValueSetting.DoesNotExist:
-        IntegerKeyValueSetting.objects.create(key="catalog-zone-soa-serial", value=1)
-        LOGGER.debug(
-            "Catalog zone SOA serial number was not set in the database. Set to 1"
-        )
-    except OperationalError as e:
-        LOGGER.error(f"ERROR: Failed to initialize the Catalog Zone's SOA serial: {e}")
-        close_old_connections()
-
-
 def _generate_member_identifier() -> str:
     return b32encode(uuid4().bytes)[0:26].lower().decode("UTF-8")
 
@@ -142,40 +140,11 @@ def update_member_identifier(zone: Zone) -> None:
         close_old_connections()
 
 
-def _create_missing_member_identifiers() -> None:
-    try:
-        existing_zone_ids = CatalogZoneMemberIdentifier.objects.values_list(
-            "zone_id", flat=True
-        )
-
-        missing_zones = Zone.objects.exclude(id__in=existing_zone_ids)
-
-        new_objects = [
-            CatalogZoneMemberIdentifier(
-                zone=zone,
-                name=_generate_member_identifier(),
-            )
-            for zone in missing_zones
-        ]
-
-        for identifier in new_objects:
-            LOGGER.debug(
-                f"Zone {identifier.zone} missing catz member identifier. Creating..."
-            )
-
-        CatalogZoneMemberIdentifier.objects.bulk_create(
-            new_objects,
-            ignore_conflicts=False,
-        )
-
-    except OperationalError as e:
-        LOGGER.error(f"ERROR: Could not create catz member identifier: {e}")
-        close_old_connections()
-
-
 def _create_soa_rdataset() -> dns.rdataset:
     try:
-        serial = IntegerKeyValueSetting.objects.get(key="catalog-zone-soa-serial").value
+        serial = IntegerKeyValueSetting.objects.get_or_create(
+            key="catalog-zone-soa-serial", defaults={"value": 1}
+        ).value
 
         # SOA Record components
         ttl = 0

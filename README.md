@@ -74,8 +74,8 @@ multiple views yields unpredicted behavior.
 #### NOTIFY
 Clients may be notified of zone changes using the NOTIFY mechanism defined in RFC 1996.
 When enabled, the zone transfer endpoint keeps track of any client that successfully queried the
-endpoint and when a zone changes. Once a zone has changed, NetBox informs each client of said
-change.
+endpoint. Once a zone has changed, NetBox informs each client about the zone changed so that the
+client can request a new zone transfer.
 
 Note that this feature uses NetBox's background job system to schedule the messages asynchronously.
 In order to work, you need at least one `rq-worker` service running in the background to handle

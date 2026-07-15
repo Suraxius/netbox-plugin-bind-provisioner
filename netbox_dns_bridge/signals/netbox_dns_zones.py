@@ -15,11 +15,15 @@ def zone_pre_save(sender, instance, **kwargs):
     zone = instance
     if zone.pk:
         try:
-            zone._old_name = sender.objects.only("name").get(pk=zone.pk).name
+            old = sender.objects.only("name", "soa_serial").get(pk=zone.pk)
+            zone._old_name = old.name
+            zone._old_soa_serial = old.soa_serial
         except sender.DoesNotExist:
             zone._old_name = None
+            zone._old_soa_serial = None
     else:
         zone._old_name = None
+        zone._old_soa_serial = None
 
 
 @receiver(post_save, sender=Zone)
@@ -37,12 +41,24 @@ def zone_post_save(sender, instance, created, **kwargs):
     except LookupError:
         pass
 
+    # Determine whether the zone's SOA serial number changed with this save.
+    # A newly created zone is always considered to have a "changed" serial.
+    old_soa_serial = getattr(zone, "_old_soa_serial", None)
+    new_soa_serial = getattr(zone, "soa_serial", None)
+    soa_serial_changed = created or (old_soa_serial != new_soa_serial)
+
     # On commit, increment soa serial and if notify is enabled, schedule bg job.
     def _on_commit():
         catzm.increment_soa_serial()
 
         if SETTINGS.get("notify_clients", False):
             notify_handler.schedule(zone)
+
+        # Force a NOTIFY to the zone's own nameservers when the zone carries the
+        # configured boolean custom field set to True and its SOA serial changed.
+        cf_name = SETTINGS.get("custom_field_force_notify")
+        if cf_name and soa_serial_changed and _force_notify_enabled(zone, cf_name):
+            notify_handler.schedule_force_ns_notify(zone)
 
     transaction.on_commit(_on_commit)
 
@@ -59,3 +75,9 @@ def zone_post_save(sender, instance, created, **kwargs):
 @receiver(post_delete, sender=Zone)
 def zone_post_delete(sender, instance, **kwargs):
     catzm.increment_soa_serial()
+
+
+def _force_notify_enabled(zone, cf_name: str) -> bool:
+    """Return True only if the zone's boolean custom field ``cf_name`` is True."""
+    custom_fields = getattr(zone, "custom_field_data", None) or {}
+    return custom_fields.get(cf_name) is True

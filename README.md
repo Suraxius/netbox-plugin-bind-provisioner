@@ -98,6 +98,36 @@ list of clients to be notified on zone changes. Default is 24 hours.
 ```
 Switch to using TCP instead of UDP. Defaults to False
 
+#### Forced NOTIFY to a zone's nameservers
+In addition to notifying clients that queried the transfer endpoint, the plugin can send a NOTIFY
+directly to a zone's own nameservers whenever that zone's SOA serial number changes. This is useful
+when you want specific zones to have their nameservers pull updates immediately, independent of the
+`notify_clients` mechanism.
+
+The feature is driven by a boolean custom field on the NetBox DNS Zone object. Create a boolean
+custom field (e.g. `dns_bridge_force_notify_ns`) that applies to `netbox_dns > zone`, then point the
+plugin at it:
+```
+'custom_field_force_notify': 'dns_bridge_force_notify_ns'
+```
+When this setting is present, every time a zone whose custom field is set to `True` changes its SOA
+serial number, the plugin schedules a background NOTIFY to each of the zone's configured nameservers.
+Only a change of the SOA serial triggers this — other zone edits that leave the serial untouched do
+not. The setting is unset by default, which disables the feature entirely.
+
+The nameserver addresses are resolved from NetBox DNS itself by looking up active A/AAAA records
+(within the zone's view) matching each nameserver's hostname. The NOTIFY messages are signed with the
+same per-view TSIG key configured under `tsig_keys`, so the receiving nameservers must accept NOTIFY
+signed with that key (e.g. BIND's `allow-notify { key "..."; };`).
+
+```
+'force_notify_port': 53
+```
+Destination port used for these forced NOTIFY messages. Defaults to 53.
+
+As with the client NOTIFY feature, this uses NetBox's background job system, so at least one
+`rq-worker` service must be running.
+
 ## Plugin compatibility
 This plugin extends the netbox-plugin-dns plugin. As such the versioning was changed to match the
 one of netbox-plugin-dns more closely. To guarantee compatability, ensure that the major and minor

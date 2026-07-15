@@ -15,7 +15,7 @@ LOGGER = get_logger(__name__)
 def increment_soa_serial() -> int:
     with transaction.atomic():
         try:
-            soa_serial_obj = (
+            soa_serial_obj, _ = (
                 IntegerKeyValueSetting.objects.select_for_update().get_or_create(
                     key="catalog-zone-soa-serial",
                     defaults={"value": 1},
@@ -137,9 +137,10 @@ def update_member_identifier(zone: NBZone) -> None:
 
 def _create_soa_rdataset() -> dns.rdataset:
     try:
-        serial = IntegerKeyValueSetting.objects.get_or_create(
+        serial_obj, _ = IntegerKeyValueSetting.objects.get_or_create(
             key="catalog-zone-soa-serial", defaults={"value": 1}
-        ).value
+        )
+        serial = serial_obj.value
 
         # SOA Record components
         ttl = 0

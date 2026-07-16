@@ -98,6 +98,45 @@ list of clients to be notified on zone changes. Default is 24 hours.
 ```
 Switch to using TCP instead of UDP. Defaults to False
 
+#### NOTIFY to a zone's own nameservers
+In addition to notifying clients that queried the transfer endpoint, the plugin can send a NOTIFY
+directly to a zone's own nameservers whenever that zone's SOA serial number changes. This is useful
+when you want nameservers to pull updates immediately, independent of the `notify_clients` mechanism.
+Only a change of the SOA serial triggers this — other zone edits that leave the serial untouched do
+not.
+
+This can be enabled per zone, globally, or both. If neither of the settings below is configured, the
+feature is disabled entirely.
+
+**Per zone (custom field).** Create a boolean custom field (e.g. `dns_bridge_notify_ns`) that applies
+to `netbox_dns > zone`, then point the plugin at it:
+```
+'notify_ns_custom_field_name': 'dns_bridge_notify_ns'
+```
+A NOTIFY is then sent for any zone whose custom field is set to `True`. This lets you toggle the
+behavior per zone straight from the NetBox UI, without changing the plugin config.
+
+**Globally (all zones).**
+```
+'notify_ns_all_zones': True
+```
+When enabled, a NOTIFY is sent for every zone on serial change, regardless of the custom field.
+Defaults to `False`. The two options coexist: a NOTIFY is sent if the global switch is on **or** the
+zone's custom field is set.
+
+The nameserver addresses are resolved from NetBox DNS itself by looking up active A/AAAA records
+(within the zone's view) matching each nameserver's hostname. The NOTIFY messages are signed with the
+same per-view TSIG key configured under `tsig_keys`, so the receiving nameservers must accept NOTIFY
+signed with that key (e.g. BIND's `allow-notify { key "..."; };`).
+
+```
+'notify_ns_port': 53
+```
+Destination port used for these NOTIFY messages. Defaults to 53.
+
+As with the client NOTIFY feature, this uses NetBox's background job system, so at least one
+`rq-worker` service must be running.
+
 ## Plugin compatibility
 This plugin extends the netbox-plugin-dns plugin. As such the versioning was changed to match the
 one of netbox-plugin-dns more closely. To guarantee compatability, ensure that the major and minor

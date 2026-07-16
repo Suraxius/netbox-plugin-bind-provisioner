@@ -1,3 +1,11 @@
+## Unreleased
+- Add the option to send a NOTIFY directly to a zone's own nameservers when its SOA serial number
+  changes. Enable it per zone via a boolean custom field named by `notify_ns_custom_field_name`,
+  globally for all zones via `notify_ns_all_zones` (default `False`), or both. Nameserver addresses
+  are resolved from NetBox DNS A/AAAA records within the zone's view and the NOTIFY is signed with
+  the per-view TSIG key. A companion `notify_ns_port` setting (default 53) controls the destination
+  port.
+
 ## 1.0.7 - 2026-03-02
 README Change - Moving private keys to global scope since Bind 9.20 view scoped keys have become unreliable and sometimes wouldnt match.
 

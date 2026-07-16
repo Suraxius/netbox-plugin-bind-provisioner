@@ -3,16 +3,11 @@ import dns.zone
 import dns.rdatatype
 import dns.rdataclass
 from .logger import get_logger
-from netbox_dns.models import Zone
+from netbox_dns.models import Zone as NBZone
 from netbox_dns_bridge.models import IntegerKeyValueSetting, CatalogZoneMemberIdentifier
 from uuid import uuid4
 from base64 import b32encode
-from django.db import (
-    transaction,
-    close_old_connections,
-    OperationalError,
-    RelatedObjectDoesNotExist
-)
+from django.db import transaction, close_old_connections, OperationalError
 
 LOGGER = get_logger(__name__)
 
@@ -20,7 +15,7 @@ LOGGER = get_logger(__name__)
 def increment_soa_serial() -> int:
     with transaction.atomic():
         try:
-            soa_serial_obj = (
+            soa_serial_obj, _ = (
                 IntegerKeyValueSetting.objects.select_for_update().get_or_create(
                     key="catalog-zone-soa-serial",
                     defaults={"value": 1},
@@ -58,7 +53,7 @@ def create_zone(name, view_name) -> dns.zone.Zone:
 
     try:
         # get zones from netbox
-        nb_zones = Zone.objects.filter(
+        nb_zones = NBZone.objects.filter(
             view__name=view_name, active=True
         ).select_related("catz_identifier")
 
@@ -71,9 +66,9 @@ def create_zone(name, view_name) -> dns.zone.Zone:
             # Create PTR record
             try:
                 catz_identifier = nb_zone.catz_identifier
-            except RelatedObjectDoesNotExist:
-                catz_identifier = nb_zone.catz_identifier.create(
-                    name=_generate_member_identifier()
+            except NBZone.catz_identifier.RelatedObjectDoesNotExist:
+                catz_identifier = CatalogZoneMemberIdentifier.objects.create(
+                    zone=nb_zone, name=_generate_member_identifier()
                 )
 
             p_name = catz_identifier.name
@@ -129,7 +124,7 @@ def _generate_member_identifier() -> str:
     return b32encode(uuid4().bytes)[0:26].lower().decode("UTF-8")
 
 
-def update_member_identifier(zone: Zone) -> None:
+def update_member_identifier(zone: NBZone) -> None:
     try:
         CatalogZoneMemberIdentifier.objects.update_or_create(
             zone=zone,
@@ -142,9 +137,10 @@ def update_member_identifier(zone: Zone) -> None:
 
 def _create_soa_rdataset() -> dns.rdataset:
     try:
-        serial = IntegerKeyValueSetting.objects.get_or_create(
+        serial_obj, _ = IntegerKeyValueSetting.objects.get_or_create(
             key="catalog-zone-soa-serial", defaults={"value": 1}
-        ).value
+        )
+        serial = serial_obj.value
 
         # SOA Record components
         ttl = 0

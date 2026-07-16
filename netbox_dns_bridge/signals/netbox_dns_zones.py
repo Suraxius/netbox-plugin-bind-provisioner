@@ -54,11 +54,10 @@ def zone_post_save(sender, instance, created, **kwargs):
         if SETTINGS.get("notify_clients", False):
             notify_handler.schedule(zone)
 
-        # Force a NOTIFY to the zone's own nameservers when the zone carries the
-        # configured boolean custom field set to True and its SOA serial changed.
-        cf_name = SETTINGS.get("custom_field_force_notify")
-        if cf_name and soa_serial_changed and _force_notify_enabled(zone, cf_name):
-            notify_handler.schedule_force_ns_notify(zone)
+        # Send a NOTIFY to the zone's own nameservers when its SOA serial changed
+        # and the feature is enabled — globally or per zone via a custom field.
+        if soa_serial_changed and _notify_ns_enabled(zone):
+            notify_handler.schedule_notify_ns(zone)
 
     transaction.on_commit(_on_commit)
 
@@ -77,7 +76,19 @@ def zone_post_delete(sender, instance, **kwargs):
     catzm.increment_soa_serial()
 
 
-def _force_notify_enabled(zone, cf_name: str) -> bool:
-    """Return True only if the zone's boolean custom field ``cf_name`` is True."""
+def _notify_ns_enabled(zone) -> bool:
+    """Return True if a NOTIFY to the zone's nameservers should be sent.
+
+    Enabled either globally for every zone via ``notify_ns_all_zones`` or per
+    zone when the boolean custom field named by ``notify_ns_custom_field_name``
+    is set to True on the zone.
+    """
+    if SETTINGS.get("notify_ns_all_zones", False):
+        return True
+
+    cf_name = SETTINGS.get("notify_ns_custom_field_name")
+    if not cf_name:
+        return False
+
     custom_fields = getattr(zone, "custom_field_data", None) or {}
     return custom_fields.get(cf_name) is True

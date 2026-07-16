@@ -111,7 +111,7 @@ class SendDNSNotify(JobRunner):
             close_old_connections()
 
 
-class SendForcedNSNotify(JobRunner):
+class SendZoneNSNotify(JobRunner):
     """Send a NOTIFY straight to a zone's own nameservers.
 
     Unlike ``SendDNSNotify`` (which notifies clients that previously queried the
@@ -121,11 +121,11 @@ class SendForcedNSNotify(JobRunner):
     """
 
     class Meta:
-        name = "Send forced DNS NOTIFY to zone nameservers"
+        name = "Send DNS NOTIFY to zone nameservers"
 
     def run(self, *args, **kwargs):
         notify_over_tcp = SETTINGS.get("notify_over_tcp", False)
-        port = SETTINGS.get("force_notify_port", 53)
+        port = SETTINGS.get("notify_ns_port", 53)
         view_name = kwargs["view_name"]
         zone_name = kwargs["zone_name"]
         soa_serial = kwargs["soa_serial"]
@@ -133,17 +133,17 @@ class SendForcedNSNotify(JobRunner):
         try:
             zone = Zone.objects.get(pk=kwargs["zone_id"])
         except Zone.DoesNotExist:
-            LOGGER.error(f"Forced NOTIFY: zone id {kwargs['zone_id']} no longer exists")
+            LOGGER.error(f"NS NOTIFY: zone id {kwargs['zone_id']} no longer exists")
             return
         except OperationalError as e:
-            LOGGER.error(f"Forced NOTIFY failed due to unexpected error: {e}")
+            LOGGER.error(f"NS NOTIFY failed due to unexpected error: {e}")
             close_old_connections()
             return
 
         ns_targets = _resolve_zone_nameserver_ips(zone)
         if not ns_targets:
             LOGGER.warning(
-                f"Forced NOTIFY: no nameserver addresses found in NetBox DNS for "
+                f"NS NOTIFY: no nameserver addresses found in NetBox DNS for "
                 f"{view_name}/{zone_name} — skipping"
             )
             return
@@ -152,7 +152,7 @@ class SendForcedNSNotify(JobRunner):
             tsig_key = _load_tsig_key(view_name)
         except RuntimeError as e:
             LOGGER.error(
-                f"Forced NOTIFY aborted for {view_name}/{zone_name}: {e}"
+                f"NS NOTIFY aborted for {view_name}/{zone_name}: {e}"
             )
             return
 
@@ -172,18 +172,18 @@ class SendForcedNSNotify(JobRunner):
         for ip in ns_targets:
             try:
                 if notify_over_tcp:
-                    LOGGER.debug("Sending forced NOTIFY over TCP")
+                    LOGGER.debug("Sending NS NOTIFY over TCP")
                     dns.query.tcp(msg, ip, port=port, timeout=2)
                 else:
-                    LOGGER.debug("Sending forced NOTIFY over UDP")
+                    LOGGER.debug("Sending NS NOTIFY over UDP")
                     dns.query.udp(msg, ip, port=port, timeout=2)
 
                 LOGGER.info(
-                    f"Forced NOTIFY sent: {ip} {view_name}/{fqdn} {soa_serial}"
+                    f"NS NOTIFY sent: {ip} {view_name}/{fqdn} {soa_serial}"
                 )
             except Exception as e:
                 LOGGER.error(
-                    f"Forced NOTIFY failed: {ip} {view_name}/{fqdn} {soa_serial}: {e}"
+                    f"NS NOTIFY failed: {ip} {view_name}/{fqdn} {soa_serial}: {e}"
                 )
 
 
@@ -253,12 +253,12 @@ def schedule(zone: Zone):
     )
 
 
-def schedule_force_ns_notify(zone: Zone):
+def schedule_notify_ns(zone: Zone):
     soa_serial = _get_soa_serial(zone)
     if soa_serial is None:
         return
 
-    SendForcedNSNotify.enqueue(
+    SendZoneNSNotify.enqueue(
         zone_id=zone.pk,
         zone_name=zone.name,
         view_name=zone.view.name,

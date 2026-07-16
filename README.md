@@ -18,7 +18,8 @@ changes (RFC 1996).
 <a href="https://pepy.tech/project/netbox-plugin-dns-bridge"><img src="https://static.pepy.tech/personalized-badge/netbox-plugin-dns-bridge?period=monthly&left_color=BLACK&right_color=BLUE&left_text=Downloads%2fMonth" alt="Downloads/Month"></a>
 <a href="https://pepy.tech/project/netbox-plugin-dns-bridge"><img src="https://static.pepy.tech/personalized-badge/netbox-plugin-dns-bridge?period=weekly&left_color=BLACK&right_color=BLUE&left_text=Downloads%2fWeek" alt="Downloads/Week"></a>
 
-## Plugin configuration
+
+# Plugin configuration
 While providing Zone transfers via AXFR, the Server also exposes specialized catalog zones that BIND
 and other RFC9432 compliant DNS Servers use to automatically discover newly created zones and remove
 deleted ones. The plugin supports views and basic DNS security via TSIG.
@@ -39,13 +40,15 @@ This process needs to be scheduled as a background service for the built-in DNS 
 correctly. For Linux users with Systemd (Ubuntu, etc), Matt Kollross provides a startup unit and
 instructions [here](docs/install-systemd-service.md).
 
-### Service parameters
+
+## Service parameters
 Parameter | Description
 --------- | -------------------------------------------------------------------
 --port    | Port to listen on for requests (defaults to 5354)
 --address | IP of interface to bind to (defaults to 0.0.0.0)
 
-### Plugin settings
+
+## Plugin settings
 Plugin settings should be configured under `PLUGINS_CONFIG` in `netbox_dns_bridge`:
 ```
 PLUGINS_CONFIG = {
@@ -56,7 +59,7 @@ PLUGINS_CONFIG = {
 }
 ```
 
-#### TSIG Authentication
+### TSIG Authentication
 Following sets the TSIG key that allows clients to query the transfer endpoint and also they key to
 be used to sign NOTIFY messages to clients on zone changes. Each view should have its own unique
 key to allow the plugin to identify the view the client is trying to access. Re-using the key for
@@ -71,7 +74,16 @@ multiple views yields unpredicted behavior.
 }
 ```
 
-#### NOTIFY
+### NOTIFY
+The plugin has 2 different NOTIFY mechanisms that may be turned on individually or together.
+1. [Client Notify](#client-notify)
+2. [NS Notify](ns-notify)
+   - [Per Zone](ns-notify-per-zone)
+   - [For all Zones](ns-notify-for-all-zones)
+     Note: This makes the *Per Zone* mechanism redundant. There is no point in enabling both.
+
+
+#### Client NOTIFY
 Clients may be notified of zone changes using the NOTIFY mechanism defined in RFC 1996.
 When enabled, the zone transfer endpoint keeps track of any client that successfully queried the
 endpoint. Once a zone has changed, NetBox informs each client about the zone changed so that the
@@ -81,7 +93,6 @@ Note that this feature uses NetBox's background job system to schedule the messa
 In order to work, you need at least one `rq-worker` service running in the background to handle
 the queued jobs.
 
-##### NOTIFY Settings
 ```
 'notify_clients': True
 ```
@@ -98,7 +109,8 @@ list of clients to be notified on zone changes. Default is 24 hours.
 ```
 Switch to using TCP instead of UDP. Defaults to False
 
-#### NOTIFY to a zone's own nameservers
+
+#### NS NOTIFY
 In addition to notifying clients that queried the transfer endpoint, the plugin can send a NOTIFY
 directly to a zone's own nameservers whenever that zone's SOA serial number changes. This is useful
 when you want nameservers to pull updates immediately, independent of the `notify_clients` mechanism.
@@ -108,7 +120,12 @@ not.
 This can be enabled per zone, globally, or both. If neither of the settings below is configured, the
 feature is disabled entirely.
 
-**Per zone (custom field).** Create a boolean custom field (e.g. `dns_bridge_notify_ns`) that applies
+
+##### NS NOTIFY per Zone
+This uses a True/False custom field attached to each Zone to enable/disable NOTIFY for each
+individually.
+
+Create a boolean custom field (e.g. `dns_bridge_notify_ns`) that applies
 to `netbox_dns > zone`, then point the plugin at it:
 ```
 'notify_ns_custom_field_name': 'dns_bridge_notify_ns'
@@ -116,13 +133,17 @@ to `netbox_dns > zone`, then point the plugin at it:
 A NOTIFY is then sent for any zone whose custom field is set to `True`. This lets you toggle the
 behavior per zone straight from the NetBox UI, without changing the plugin config.
 
-**Globally (all zones).**
+
+##### NS NOTIFY for all Zones
 ```
 'notify_ns_all_zones': True
 ```
 When enabled, a NOTIFY is sent for every zone on serial change, regardless of the custom field.
 Defaults to `False`. The two options coexist: a NOTIFY is sent if the global switch is on **or** the
 zone's custom field is set.
+
+
+##### NS NOTIFY Settings
 
 The nameserver addresses are resolved from NetBox DNS itself by looking up active A/AAAA records
 (within the zone's view) matching each nameserver's hostname. The NOTIFY messages are signed with the
@@ -137,11 +158,13 @@ Destination port used for these NOTIFY messages. Defaults to 53.
 As with the client NOTIFY feature, this uses NetBox's background job system, so at least one
 `rq-worker` service must be running.
 
+
 ## Plugin compatibility
 This plugin extends the netbox-plugin-dns plugin. As such the versioning was changed to match the
 one of netbox-plugin-dns more closely. To guarantee compatability, ensure that the major and minor
 version match between both plugins. For example, when using netbox-plugin-dns `v1.5.5` install
 netbox-plugin-dns-bridge `v1.5.x`.
+
 
 ## Installation guide
 This setup provisions a BIND9 server directly with DNS data from NetBox. BIND9 can optionally run on

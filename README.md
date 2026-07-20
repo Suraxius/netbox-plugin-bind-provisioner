@@ -60,7 +60,7 @@ PLUGINS_CONFIG = {
 ```
 
 ### TSIG Authentication
-Following sets the TSIG key that allows clients to query the transfer endpoint and also they key to
+Following sets the TSIG key that allows clients to query the transfer endpoint and also the key to
 be used to sign NOTIFY messages to clients on zone changes. Each view should have its own unique
 key to allow the plugin to identify the view the client is trying to access. Re-using the key for
 multiple views yields unpredicted behavior.
@@ -76,10 +76,18 @@ multiple views yields unpredicted behavior.
 
 ### NOTIFY
 The plugin has 2 different NOTIFY mechanisms that may be turned on individually or together.
+
 1. [Client Notify](#client-notify)
-2. [NS Notify](ns-notify)
-   - [Per Zone](ns-notify-per-zone)
-   - [For all Zones](ns-notify-for-all-zones)
+   Notify clients that are regularly contacting the transfer endpoint for zone updates.
+
+2. [NS Notify](#ns-notify)
+   Notify the zone's NS Servers when a zone changes.
+
+   - [Per Zone](#ns-notify-per-zone)
+     Notify NS servers for zones that have a specific custom field set to true.
+
+   - [For all Zones](#ns-notify-for-all-zones)
+     Notify NS servers for all zones.
      Note: This makes the *Per Zone* mechanism redundant. There is no point in enabling both.
 
 #### Global NOTIFY Settings

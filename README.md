@@ -82,6 +82,11 @@ The plugin has 2 different NOTIFY mechanisms that may be turned on individually 
    - [For all Zones](ns-notify-for-all-zones)
      Note: This makes the *Per Zone* mechanism redundant. There is no point in enabling both.
 
+#### Global NOTIFY Settings
+```
+'notify_over_tcp': True
+```
+Switch to using TCP instead of UDP. Defaults to False
 
 #### Client NOTIFY
 Clients may be notified of zone changes using the NOTIFY mechanism defined in RFC 1996.
@@ -104,10 +109,12 @@ This enables the NOTIFY system. Defaults to False
 This sets how long a client is considred "alive" after it last queried the transfer endpoint. 
 Once the client has failed to check in for this amout of time, it is automatically removed from the
 list of clients to be notified on zone changes. Default is 24 hours.
+
 ```
-'notify_over_tcp': True
+'notify_client_port': 53
 ```
-Switch to using TCP instead of UDP. Defaults to False
+Destination port used to send NOTIFY messages to clients. Defaults to 53.
+
 
 
 #### NS NOTIFY

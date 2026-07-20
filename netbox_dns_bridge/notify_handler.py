@@ -48,6 +48,7 @@ class SendDNSNotify(JobRunner):
 
     def run(self, *args, **kwargs):
         notify_over_tcp = SETTINGS.get("notify_over_tcp", False)
+        port = SETTINGS.get("notify_client_port", 53)
         view_name = kwargs["view_name"]
 
         try:
@@ -89,10 +90,10 @@ class SendDNSNotify(JobRunner):
                     try:
                         if notify_over_tcp:
                             LOGGER.debug("Sending NOTIFY over TCP")
-                            dns.query.tcp(msg, client.source_ip, port=5355, timeout=2)
+                            dns.query.tcp(msg, client.source_ip, port=port, timeout=2)
                         else:
                             LOGGER.debug("Sending NOTIFY over UDP")
-                            dns.query.udp(msg, client.source_ip, port=5355, timeout=2)
+                            dns.query.udp(msg, client.source_ip, port=port, timeout=2)
 
                         LOGGER.info(
                             f"NOTIFY sent: {client.source_ip} {view_name}/{zone_name} {soa_serial}"

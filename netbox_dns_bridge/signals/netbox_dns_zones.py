@@ -52,12 +52,12 @@ def zone_post_save(sender, instance, created, **kwargs):
         catzm.increment_soa_serial()
 
         if SETTINGS.get("notify_clients", False):
-            notify_handler.schedule(zone)
+            notify_handler.schedule_client_notify(zone)
 
         # Send a NOTIFY to the zone's own nameservers when its SOA serial changed
         # and the feature is enabled — globally or per zone via a custom field.
         if soa_serial_changed and _notify_ns_enabled(zone):
-            notify_handler.schedule_notify_ns(zone)
+            notify_handler.schedule_ns_notify(zone)
 
     transaction.on_commit(_on_commit)
 

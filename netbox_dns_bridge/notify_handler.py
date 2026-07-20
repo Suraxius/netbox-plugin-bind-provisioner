@@ -42,7 +42,7 @@ def _load_tsig_key(view_name: str) -> dns.tsig.Key:
     return dns.tsig.Key(name=key_name, secret=secret, algorithm=algorithm)
 
 
-class SendDNSNotify(JobRunner):
+class SendClientDNSNotify(JobRunner):
     class Meta:
         name = "Send DNS NOTIFY"
 
@@ -100,7 +100,7 @@ class SendDNSNotify(JobRunner):
                         )
                     except Exception as e:
                         LOGGER.error(
-                            f"NOTIFY failed: {client.source_ip}"
+                            f"NOTIFY failed: {client.source_ip}:{port}"
                             f" {view_name}/{zone_name} {soa_serial}: {e}"
                         )
 
@@ -112,10 +112,10 @@ class SendDNSNotify(JobRunner):
             close_old_connections()
 
 
-class SendZoneNSNotify(JobRunner):
+class SendNSNotify(JobRunner):
     """Send a NOTIFY straight to a zone's own nameservers.
 
-    Unlike ``SendDNSNotify`` (which notifies clients that previously queried the
+    Unlike ``SendClientDNSNotify`` (which notifies clients that previously queried the
     transfer endpoint), this job resolves the addresses of the zone's configured
     nameservers from NetBox DNS itself and notifies each of them so they pick up
     the changed zone quickly.
@@ -152,9 +152,7 @@ class SendZoneNSNotify(JobRunner):
         try:
             tsig_key = _load_tsig_key(view_name)
         except RuntimeError as e:
-            LOGGER.error(
-                f"NS NOTIFY aborted for {view_name}/{zone_name}: {e}"
-            )
+            LOGGER.error(f"NS NOTIFY aborted for {view_name}/{zone_name}: {e}")
             return
 
         fqdn = dns.name.from_text(zone_name, dns.name.root).to_text()
@@ -179,9 +177,7 @@ class SendZoneNSNotify(JobRunner):
                     LOGGER.debug("Sending NS NOTIFY over UDP")
                     dns.query.udp(msg, ip, port=port, timeout=2)
 
-                LOGGER.info(
-                    f"NS NOTIFY sent: {ip} {view_name}/{fqdn} {soa_serial}"
-                )
+                LOGGER.info(f"NS NOTIFY sent: {ip} {view_name}/{fqdn} {soa_serial}")
             except Exception as e:
                 LOGGER.error(
                     f"NS NOTIFY failed: {ip} {view_name}/{fqdn} {soa_serial}: {e}"
@@ -242,24 +238,24 @@ def _resolve_zone_nameserver_ips(zone: Zone) -> list:
     return ips
 
 
-def schedule(zone: Zone):
+def schedule_client_notify(zone: Zone):
     soa_serial = _get_soa_serial(zone)
     if soa_serial is None:
         return
 
-    SendDNSNotify.enqueue(
+    SendClientDNSNotify.enqueue(
         zone_name=zone.name,
         view_name=zone.view.name,
         soa_serial=soa_serial,
     )
 
 
-def schedule_notify_ns(zone: Zone):
+def schedule_ns_notify(zone: Zone):
     soa_serial = _get_soa_serial(zone)
     if soa_serial is None:
         return
 
-    SendZoneNSNotify.enqueue(
+    SendNSNotify.enqueue(
         zone_id=zone.pk,
         zone_name=zone.name,
         view_name=zone.view.name,

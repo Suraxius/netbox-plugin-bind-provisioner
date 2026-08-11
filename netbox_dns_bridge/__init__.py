@@ -17,6 +17,7 @@ class DNSBridgeConfig(PluginConfig):
     base_url = "dns-bridge"
 
     def ready(self):
+        super().ready()
         self.settings = settings.PLUGINS_CONFIG.get(self.name, None)
         if not self.settings:
             raise RuntimeError(

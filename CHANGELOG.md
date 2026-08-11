@@ -1,4 +1,7 @@
 ## Unreleased
+- Defer the catalog zone SOA serial increment on zone deletion to `transaction.on_commit`, matching
+  the create/modify path. Previously the increment ran immediately at `post_delete` time, so a
+  rollback of the delete transaction would have left the catalog serial bumped anyway.
 - Add the option to send a NOTIFY directly to a zone's own nameservers when its SOA serial number
   changes. Enable it per zone via a boolean custom field named by `notify_ns_custom_field_name`,
   globally for all zones via `notify_ns_all_zones` (default `False`), or both. Nameserver addresses

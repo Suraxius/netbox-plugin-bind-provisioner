@@ -72,7 +72,10 @@ def zone_post_save(sender, instance, created, **kwargs):
 
 @receiver(post_delete, sender=Zone)
 def zone_post_delete(sender, instance, **kwargs):
-    catzm.increment_soa_serial()
+    def _on_commit():
+        catzm.increment_soa_serial()
+
+    transaction.on_commit(_on_commit)
 
 
 def _notify_ns_enabled(zone) -> bool:

@@ -1,50 +1,37 @@
-from collections import OrderedDict
-
 from django.contrib.auth.decorators import user_passes_test
 from django.shortcuts import render
 from django.utils.decorators import method_decorator
 from django.views import View
 
+import netbox_dns.models
+from netbox.views.generic import ObjectListView
+
+from .filtersets import ZoneFilterSet
+from .forms import CatalogZoneFilterForm
 from .models import IntegerKeyValueSetting, SeenTransferClients
+from .tables import CatalogZoneTable
 
 
 @method_decorator(
     user_passes_test(lambda u: u.is_superuser), name="dispatch"
 )
-class CatzOverviewView(View):
+class CatzOverviewView(ObjectListView):
+    queryset = netbox_dns.models.Zone.objects.select_related(
+        "view", "catz_identifier"
+    ).order_by("view__name", "name")
+    table = CatalogZoneTable
+    filterset = ZoneFilterSet
+    filterset_form = CatalogZoneFilterForm
     template_name = "netbox_dns_bridge/catz_overview.html"
+    actions = ()
 
-    def get(self, request):
-        import netbox_dns.models
-
+    def get_extra_context(self, request):
+        context = super().get_extra_context(request)
         soa_serial_obj = IntegerKeyValueSetting.objects.filter(
             key="catalog-zone-soa-serial"
         ).first()
-        soa_serial = soa_serial_obj.value if soa_serial_obj else None
-
-        zones_grouped = OrderedDict()
-        for z in netbox_dns.models.Zone.objects.select_related(
-            "view", "catz_identifier"
-        ).order_by("view__name", "name"):
-            view_name = z.view.name if z.view else ""
-            view_display = view_name[0].upper() + view_name[1:] if view_name else ""
-            try:
-                catz_identifier = z.catz_identifier.name
-            except netbox_dns.models.Zone.catz_identifier.RelatedObjectDoesNotExist:
-                catz_identifier = None
-            zones_grouped.setdefault(view_display, []).append(
-                {
-                    "name": z.name,
-                    "active": z.active,
-                    "catz_identifier": catz_identifier,
-                }
-            )
-
-        context = {
-            "soa_serial": soa_serial,
-            "zones_grouped": zones_grouped,
-        }
-        return render(request, self.template_name, context)
+        context["soa_serial"] = soa_serial_obj.value if soa_serial_obj else None
+        return context
 
 
 @method_decorator(

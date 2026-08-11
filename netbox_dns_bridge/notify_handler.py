@@ -83,7 +83,7 @@ class SendClientDNSNotify(JobRunner):
                     f"invalid. invalid. {soa_serial} 60 10 1209600 0",
                 )
                 soa_rrset = dns.rrset.from_rdata(zone_name, 0, soa_rdata)
-                msg.authority.append(soa_rrset)
+                msg.answer.append(soa_rrset)
                 msg.use_tsig(keyring={tsig_key.name: tsig_key}, keyname=tsig_key.name)
 
                 for client in clients:
@@ -165,7 +165,7 @@ class SendNSNotify(JobRunner):
             dns.rdatatype.SOA,
             f"invalid. invalid. {soa_serial} 60 10 1209600 0",
         )
-        msg.authority.append(dns.rrset.from_rdata(fqdn, 0, soa_rdata))
+        msg.answer.append(dns.rrset.from_rdata(fqdn, 0, soa_rdata))
         msg.use_tsig(keyring={tsig_key.name: tsig_key}, keyname=tsig_key.name)
 
         for ip in ns_targets:

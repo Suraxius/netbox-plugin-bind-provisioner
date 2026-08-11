@@ -28,8 +28,8 @@ class DNSBaseRequestHandler(socketserver.BaseRequestHandler):
         self.RESERVED_TSIG = 300
         super().__init__(request, client_address, server)
 
-    # _getZoneFromNB rewritten
-    def _getZoneFromNB(self, zone_name, view_name) -> dns.zone.Zone:
+    # _get_zone_from_nb rewritten
+    def _get_zone_from_nb(self, zone_name, view_name) -> dns.zone.Zone:
         # Find the zone
         try:
             nb_zone = Zone.objects.get(
@@ -361,7 +361,7 @@ class DNSBaseRequestHandler(socketserver.BaseRequestHandler):
         if dname == "catz" or dname == f"{nb_view.name}.catz":
             zone = catzm.create_zone(dname, nb_view.name)
         else:
-            zone = self._getZoneFromNB(dname, nb_view.name)
+            zone = self._get_zone_from_nb(dname, nb_view.name)
         # When zone was not found, let client know
         if not zone:
             LOGGER.warning(f"Zone {dname} not found in view {nb_view.name}")

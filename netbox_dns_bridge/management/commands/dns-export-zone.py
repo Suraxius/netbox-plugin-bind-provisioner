@@ -37,13 +37,10 @@ class Command(BaseCommand):
                 view__name=view_name, name=zone_name
             )
 
-            if nb_zone:
-                export_bind_zone_file(nb_zone, file_path=file_path)
-                self.stdout.write(
-                    self.style.SUCCESS(f"Zone '{zone_name}' exported to '{file_path}'")
-                )
-            else:
-                self.stderr.write("Zone not found in Netbox. Aborting")
+            export_bind_zone_file(nb_zone, file_path=file_path)
+            self.stdout.write(
+                self.style.SUCCESS(f"Zone '{zone_name}' exported to '{file_path}'")
+            )
 
         except Exception as e:
             raise CommandError(f"Failed to export zone: {e}")

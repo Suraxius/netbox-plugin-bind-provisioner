@@ -319,7 +319,7 @@ class DNSBaseRequestHandler(socketserver.BaseRequestHandler):
             return
 
         except Exception as e:
-            LOGGER.error("Error parsing query: ", e)
+            LOGGER.error(f"Error parsing query: {e}")
             return
 
         # If there was no question in the query, refuse

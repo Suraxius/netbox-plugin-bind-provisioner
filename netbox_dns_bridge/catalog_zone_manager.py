@@ -15,11 +15,12 @@ LOGGER = get_logger(__name__)
 def increment_soa_serial() -> int:
     with transaction.atomic():
         try:
-            soa_serial_obj, _ = (
-                IntegerKeyValueSetting.objects.select_for_update().get_or_create(
-                    key="catalog-zone-soa-serial",
-                    defaults={"value": 1},
-                )
+            (
+                soa_serial_obj,
+                _,
+            ) = IntegerKeyValueSetting.objects.select_for_update().get_or_create(
+                key="catalog-zone-soa-serial",
+                defaults={"value": 1},
             )
 
             new_soa_serial = soa_serial_obj.value + 1

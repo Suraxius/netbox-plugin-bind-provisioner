@@ -42,8 +42,7 @@ def build_dns_zone(nb_zone: netbox_dns.models.Zone) -> dns.zone.Zone:
                 # an unquoted value to be larger then 255 characters,
                 # it misunderstood everything behind a ; as a comment.
                 chunks = [
-                    '"{}"'.format(value[i : i + 255])
-                    for i in range(0, len(value), 255)
+                    '"{}"'.format(value[i : i + 255]) for i in range(0, len(value), 255)
                 ]
                 value = " ".join(chunks)
             else:

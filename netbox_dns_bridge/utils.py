@@ -4,7 +4,12 @@ import dns.rdatatype
 import dns.rdataclass
 import dns.rdataset
 import netbox_dns.models
-from .logger import get_logger
+import logging
+
+
+def get_logger(name: str) -> logging.Logger:
+    return logging.getLogger("dns-bridge")
+
 
 LOGGER = get_logger(__name__)
 

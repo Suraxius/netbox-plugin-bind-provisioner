@@ -1,6 +1,6 @@
 import socketserver
 import socket
-from .logger import get_logger
+from netbox_dns_bridge.utils import get_logger
 
 LOGGER = get_logger(__name__)
 

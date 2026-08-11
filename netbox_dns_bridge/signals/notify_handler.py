@@ -11,12 +11,11 @@ from django.utils import timezone
 from django.db import close_old_connections, OperationalError
 from netbox.jobs import JobRunner
 from netbox_dns.models import View, Zone, Record
-from .logger import get_logger
-from .models import SeenTransferClients, IntegerKeyValueSetting
+from netbox_dns_bridge.utils import get_logger
+from netbox_dns_bridge.models import SeenTransferClients, IntegerKeyValueSetting
 
 LOGGER = get_logger(__name__)
-SETTINGS = settings.PLUGINS_CONFIG["netbox_dns_bridge"]
-
+SETTINGS = settings.PLUGINS_CONFIG.get("netbox_dns_bridge", {})
 
 def _load_tsig_key(view_name: str) -> dns.tsig.Key:
     tsig_keys = SETTINGS.get("tsig_keys", {})

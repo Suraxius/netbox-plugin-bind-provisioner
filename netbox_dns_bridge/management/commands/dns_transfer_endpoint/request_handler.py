@@ -10,17 +10,16 @@ import dns.rdataclass
 import dns.rdtypes
 import dns.exception
 import dns.renderer
-from .logger import get_logger
 from django.utils import timezone
 from django.db import close_old_connections, OperationalError
 from django.conf import settings
-from netbox_dns.models import Zone, Record, View
-from netbox_dns_bridge import catalog_zone_manager as catzm
-from .models import SeenTransferClients
-from .utils import build_dns_zone
+from netbox_dns.models import Zone, View
+from . import catalog_zone_manager as catzm
+from netbox_dns_bridge.models import SeenTransferClients
+from netbox_dns_bridge.utils import build_dns_zone, get_logger
 
 LOGGER = get_logger(__name__)
-SETTINGS = settings.PLUGINS_CONFIG["netbox_dns_bridge"]
+SETTINGS = settings.PLUGINS_CONFIG.get("netbox_dns_bridge", {})
 
 
 class DNSBaseRequestHandler(socketserver.BaseRequestHandler):

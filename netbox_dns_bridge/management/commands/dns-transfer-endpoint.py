@@ -15,9 +15,9 @@ from django.core.management.base import BaseCommand
 from django.conf import settings
 from django.db import OperationalError
 from netbox_dns.models import View
-from netbox_dns_bridge.request_handler import UDPRequestHandler, TCPRequestHandler
-from netbox_dns_bridge.dns_server import UDPDNSServer, TCPDNSServer
-from netbox_dns_bridge.logger import get_logger
+from .dns_transfer_endpoint.request_handler import UDPRequestHandler, TCPRequestHandler
+from .dns_transfer_endpoint.dns_server import UDPDNSServer, TCPDNSServer
+from netbox_dns_bridge.utils import get_logger
 
 LOGGER = get_logger(__name__)
 SETTINGS = settings.PLUGINS_CONFIG.get("netbox_dns_bridge", {})

@@ -2,12 +2,13 @@ import dns.name
 import dns.zone
 import dns.rdatatype
 import dns.rdataclass
-from .logger import get_logger
+from netbox_dns_bridge.utils import get_logger
 from netbox_dns.models import Zone as NBZone
 from netbox_dns_bridge.models import IntegerKeyValueSetting, CatalogZoneMemberIdentifier
 from uuid import uuid4
 from base64 import b32encode
 from django.db import transaction, close_old_connections, OperationalError
+
 
 LOGGER = get_logger(__name__)
 

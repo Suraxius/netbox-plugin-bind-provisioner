@@ -4,11 +4,10 @@ from django.db import transaction
 from django.conf import settings
 from netbox.context import current_request
 from netbox_dns.models import Zone
-from netbox_dns_bridge import catalog_zone_manager as catzm
-from netbox_dns_bridge import notify_handler
+from netbox_dns_bridge.management.commands.dns_transfer_endpoint import catalog_zone_manager as catzm
+from . import notify_handler
 
-SETTINGS = settings.PLUGINS_CONFIG["netbox_dns_bridge"]
-
+SETTINGS = settings.PLUGINS_CONFIG.get("netbox_dns_bridge", {})
 
 @receiver(pre_save, sender=Zone)
 def zone_pre_save(sender, instance, **kwargs):

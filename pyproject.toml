@@ -22,6 +22,9 @@ include-package-data = true
 zip-safe = false
 package-dir = { "" = "." }
 
+[tool.setuptools.package-data]
+netbox_dns_bridge = ["templates/**/*.html"]
+
 [tool.setuptools.packages.find]
 where = ["."]
 

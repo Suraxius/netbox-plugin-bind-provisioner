@@ -1,0 +1,68 @@
+{% extends 'base/layout.html' %}
+
+{% block title %}Catalog Zone Info{% endblock %}
+
+{% block content %}
+<div class="row">
+  <div class="col-md-12">
+
+    <div class="card mb-3">
+      <h5 class="card-header">Catalog Zone SOA Serial Number</h5>
+      <div class="card-body">
+        <table class="table table-striped">
+          <thead>
+            <tr>
+              <th>Value</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% if soa_serial is not None %}
+            <tr>
+              <td>{{ soa_serial }}</td>
+            </tr>
+            {% else %}
+            <tr><td class="text-muted">Not yet initialized.</td></tr>
+            {% endif %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    {% for view_name, rows in zones_grouped.items %}
+    <div class="card mb-3">
+      <h5 class="card-header">Zone Identifiers | {{ view_name }}</h5>
+      <div class="card-body">
+        <table class="table table-striped">
+          <thead>
+            <tr>
+              <th>Zone</th>
+              <th>Active</th>
+              <th>Catalog Zone Identifier</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for z in rows %}
+            <tr>
+              <td>{{ z.name }}</td>
+              <td>{{ z.active|yesno:"Yes,No" }}</td>
+              <td>{{ z.catz_identifier|default:"—" }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="3" class="text-muted">No zones in this view.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    {% empty %}
+    <div class="card mb-3">
+      <h5 class="card-header">Zone Identifiers</h5>
+      <div class="card-body">
+        <p class="text-muted">No zones found.</p>
+      </div>
+    </div>
+    {% endfor %}
+
+  </div>
+</div>
+{% endblock %}

@@ -1,7 +1,8 @@
 from django.urls import path
 
-from .views import InfoView
+from .views import CatzOverviewView, NotifyOverviewView
 
 urlpatterns = [
-    path("info/", InfoView.as_view(), name="info"),
+    path("catz/", CatzOverviewView.as_view(), name="catz"),
+    path("notify/", NotifyOverviewView.as_view(), name="notify"),
 ]

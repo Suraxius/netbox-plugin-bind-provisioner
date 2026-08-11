@@ -24,6 +24,8 @@ SETTINGS = settings.PLUGINS_CONFIG["netbox_dns_bridge"]
 
 
 class DNSBaseRequestHandler(socketserver.BaseRequestHandler):
+    transport = None
+
     def __init__(self, request, client_address, server) -> None:
         self.MAX_WIRE = 65535
         self.RESERVED_TSIG = 300
@@ -265,6 +267,11 @@ class DNSBaseRequestHandler(socketserver.BaseRequestHandler):
             self._deny_request(query)
             return
 
+        if qtype == dns.rdatatype.AXFR and self.transport != "tcp":
+            LOGGER.warning(f"Request denied from {peer}: AXFR requires TCP")
+            self._deny_request(query, dns.rcode.REFUSED)
+            return
+
         # Identify TSIG key used
         if not query.had_tsig:
             LOGGER.warning(f"Request denied from {peer}: No TSIG key used")
@@ -309,6 +316,8 @@ class DNSBaseRequestHandler(socketserver.BaseRequestHandler):
 
 
 class UDPRequestHandler(DNSBaseRequestHandler):
+    transport = "udp"
+
     def __init__(self, request, client_address, server) -> None:
         super().__init__(request, client_address, server)
 
@@ -329,6 +338,8 @@ class UDPRequestHandler(DNSBaseRequestHandler):
 
 
 class TCPRequestHandler(DNSBaseRequestHandler):
+    transport = "tcp"
+
     def __init__(self, request, client_address, server) -> None:
         super().__init__(request, client_address, server)
 

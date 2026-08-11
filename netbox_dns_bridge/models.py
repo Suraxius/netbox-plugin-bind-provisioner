@@ -7,7 +7,7 @@ import netbox_dns.models
 class IntegerKeyValueSetting(models.Model):
     _netbox_private = True
 
-    key = models.CharField(max_length=64)
+    key = models.CharField(max_length=64, unique=True)
     value = models.IntegerField()
 
     def __str__(self):

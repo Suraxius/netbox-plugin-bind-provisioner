@@ -1,4 +1,5 @@
 import threading
+import sys
 import dns.query
 import dns.message
 import dns.tsigkeyring
@@ -12,7 +13,7 @@ import dns.renderer
 
 from django.core.management.base import BaseCommand
 from django.conf import settings
-from django.db import close_old_connections, OperationalError
+from django.db import OperationalError
 from netbox_dns.models import View
 from netbox_dns_bridge.request_handler import UDPRequestHandler, TCPRequestHandler
 from netbox_dns_bridge.dns_server import UDPDNSServer, TCPDNSServer
@@ -30,34 +31,42 @@ class Command(BaseCommand):
         self.tsig_view_map = {}
 
         for view_name, data in self.tsig_keys.items():
-            raw_key_name = data.get("keyname")
+            key_name = data.get("keyname")
             secret = data.get("secret")
-            algorithm_str = data.get("algorithm", "hmac-sha256")
+            algorithm = data.get("algorithm", "hmac-sha256")
 
-            if not raw_key_name or not secret:
+            if not key_name:
                 LOGGER.error(
-                    f"Skipping TSIG key for view {view_name}: missing keyname or secret."
+                    f"TSIG key for view {view_name} not found. Cannot start transfer endpoint."
                 )
-                continue
+                sys.exit(1)
+            elif not secret:
+                LOGGER.error(
+                    f"TSIG secret for key {key_name} not found. Cannot start transfer endpoint."
+                )
+                sys.exit(1)
 
             try:
                 nb_view = View.objects.get(name=view_name)
             except View.DoesNotExist:
                 LOGGER.error(
-                    f"Skipping TSIG key {raw_key_name}: view '{view_name}' not found."
+                    f"Skipping TSIG key {key_name}: View '{view_name}' not found in database."
                 )
                 continue
-            except OperationalError:
-                close_old_connections()
+            except OperationalError as e:
+                LOGGER.error(
+                    f"There was an error retrieving view model from database: {e}"
+                )
+                sys.exit(1)
 
             # Normalize key name to absolute DNS name
-            key_name_obj = dns.name.from_text(raw_key_name, origin=None).canonicalize()
-            if not key_name_obj.is_absolute():
-                key_name_obj = key_name_obj.concatenate(dns.name.root)
+            key_name_obj = dns.name.from_text(
+                key_name, origin=dns.name.root
+            ).canonicalize()
             key_name_str = key_name_obj.to_text()  # Will always include trailing do
 
             self.keyring[key_name_obj] = dns.tsig.Key(
-                name=key_name_obj, secret=secret, algorithm=algorithm_str
+                name=key_name_obj, secret=secret, algorithm=algorithm
             )
             self.tsig_view_map[key_name_str] = nb_view
             LOGGER.info(f"Loaded TSIG key {key_name_str} for view {nb_view.name}")

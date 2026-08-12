@@ -1,4 +1,15 @@
 ## Unreleased
+- Replace the global `IntegerKeyValueSetting` model (single `catalog-zone-soa-serial`
+  value shared by all catalog zones) with a new `CatalogZone` model that has a 1:1
+  foreign key to `netbox_dns.models.View` and its own `soa_serial` field. Each view's
+  catalog zone now tracks and increments its SOA serial independently. Existing serials
+  are preserved during migration by copying the old global value into every view's new
+  `CatalogZone` row.
+- Change the `CatalogZoneMemberIdentifier.name` uniqueness from globally unique to
+  unique per catalog zone (`UniqueConstraint(name, catalog_zone)`). A `catalog_zone`
+  foreign key has been added to the identifier model to enforce this.
+- Remove the `dns-settings` management command, which was a generic get/set/list
+  interface over `IntegerKeyValueSetting` (now removed).
 - Defer the catalog zone SOA serial increment on zone deletion to `transaction.on_commit`, matching
   the create/modify path. Previously the increment ran immediately at `post_delete` time, so a
   rollback of the delete transaction would have left the catalog serial bumped anyway.

@@ -7,12 +7,27 @@
 <div class="row mb-3">
   <div class="col-md-12">
     <div class="card">
-      <h5 class="card-header">{% trans "Catalog Zone SOA Serial Number" %}</h5>
+      <h5 class="card-header">{% trans "Catalog Zone SOA Serial Numbers" %}</h5>
       <div class="card-body">
-        {% if soa_serial is not None %}
-          <span>{{ soa_serial }}</span>
+        {% if catalog_zones %}
+          <table class="table table-sm">
+            <thead>
+              <tr>
+                <th>{% trans "View" %}</th>
+                <th>{% trans "SOA Serial" %}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for cz in catalog_zones %}
+                <tr>
+                  <td>{{ cz.view.name }}</td>
+                  <td>{{ cz.soa_serial }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
         {% else %}
-          <span class="text-muted">{% trans "Not yet initialized." %}</span>
+          <span class="text-muted">{% trans "No catalog zones initialized." %}</span>
         {% endif %}
       </div>
     </div>

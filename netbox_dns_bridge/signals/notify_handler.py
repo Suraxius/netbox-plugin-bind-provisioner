@@ -12,7 +12,7 @@ from django.db import close_old_connections, OperationalError
 from netbox.jobs import JobRunner
 from netbox_dns.models import View, Zone, Record
 from netbox_dns_bridge.utils import get_logger
-from netbox_dns_bridge.models import SeenTransferClients, IntegerKeyValueSetting
+from netbox_dns_bridge.models import SeenTransferClients, CatalogZone
 
 LOGGER = get_logger(__name__)
 SETTINGS = settings.PLUGINS_CONFIG.get("netbox_dns_bridge", {})
@@ -51,9 +51,12 @@ class SendClientDNSNotify(JobRunner):
         view_name = kwargs["view_name"]
 
         try:
-            catz_serial = IntegerKeyValueSetting.objects.get(
-                key="catalog-zone-soa-serial"
-            ).value
+            view = View.objects.get(name=view_name)
+            try:
+                catz_serial = view.catalog_zone.soa_serial
+            except CatalogZone.DoesNotExist as e:
+                LOGGER.error(f"Failed to get catalog zone serial: {e}")
+                return
 
             zones = [
                 (kwargs["zone_name"], kwargs["soa_serial"]),
@@ -61,7 +64,6 @@ class SendClientDNSNotify(JobRunner):
                 (f"{view_name}.catz", catz_serial),
             ]
 
-            view = View.objects.get(name=view_name)
             tsig_key = _load_tsig_key(view_name)
             cutoff_hours = SETTINGS.get("notify_client_alive_threshold_hours", 24)
             seen_cutoff = timezone.now() - timezone.timedelta(hours=cutoff_hours)
@@ -103,8 +105,8 @@ class SendClientDNSNotify(JobRunner):
                             f" {view_name}/{zone_name} {soa_serial}: {e}"
                         )
 
-        except IntegerKeyValueSetting.DoesNotExist as e:
-            LOGGER.error(f"Failed to get catalog zone serial: {e}")
+        except View.DoesNotExist as e:
+            LOGGER.error(f"Failed to get view for NOTIFY: {e}")
 
         except OperationalError as e:
             LOGGER.error(f"NOTIFY failed due to unexpected error: {e}")

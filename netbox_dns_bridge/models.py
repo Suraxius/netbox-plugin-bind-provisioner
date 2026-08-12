@@ -4,14 +4,21 @@ from django.db import models
 import netbox_dns.models
 
 
-class IntegerKeyValueSetting(models.Model):
+class CatalogZone(models.Model):
     _netbox_private = True
 
-    key = models.CharField(max_length=64, unique=True)
-    value = models.IntegerField()
+    view = models.OneToOneField(
+        to=netbox_dns.models.View,
+        on_delete=models.CASCADE,
+        related_name="catalog_zone",
+    )
+    soa_serial = models.IntegerField(default=1)
+
+    class Meta:
+        ordering = ("view__name",)
 
     def __str__(self):
-        return f"{self.key}: {str(self.value)}"
+        return f"{self.view.name}: {self.soa_serial}"
 
 
 class CatalogZoneMemberIdentifier(models.Model):
@@ -19,7 +26,6 @@ class CatalogZoneMemberIdentifier(models.Model):
 
     name = models.CharField(
         max_length=26,
-        unique=True,
     )
 
     zone = models.OneToOneField(
@@ -28,8 +34,20 @@ class CatalogZoneMemberIdentifier(models.Model):
         related_name="catz_identifier",
     )
 
+    catalog_zone = models.ForeignKey(
+        to=CatalogZone,
+        on_delete=models.CASCADE,
+        related_name="member_identifiers",
+    )
+
     class Meta:
         ordering = ("name",)
+        constraints = [
+            models.UniqueConstraint(
+                fields=["name", "catalog_zone"],
+                name="unique_name_per_catalog_zone",
+            ),
+        ]
 
     def __str__(self):
         return self.name

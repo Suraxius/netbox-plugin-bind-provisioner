@@ -8,7 +8,7 @@ from netbox.views.generic import ObjectListView
 
 from .filtersets import ZoneFilterSet
 from .forms import CatalogZoneFilterForm
-from .models import IntegerKeyValueSetting, SeenTransferClients
+from .models import CatalogZone, SeenTransferClients
 from .tables import CatalogZoneTable
 
 
@@ -27,10 +27,9 @@ class CatzOverviewView(ObjectListView):
 
     def get_extra_context(self, request):
         context = super().get_extra_context(request)
-        soa_serial_obj = IntegerKeyValueSetting.objects.filter(
-            key="catalog-zone-soa-serial"
-        ).first()
-        context["soa_serial"] = soa_serial_obj.value if soa_serial_obj else None
+        context["catalog_zones"] = CatalogZone.objects.select_related(
+            "view"
+        ).order_by("view__name")
         return context
 
 

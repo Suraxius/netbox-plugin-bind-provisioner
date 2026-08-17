@@ -4,7 +4,9 @@ from django.db import migrations, models
 
 def copy_serials_and_link_identifiers(apps, schema_editor):
     """Seed one CatalogZone per view from the old global serial and link identifiers."""
-    IntegerKeyValueSetting = apps.get_model("netbox_dns_bridge", "IntegerKeyValueSetting")
+    IntegerKeyValueSetting = apps.get_model(
+        "netbox_dns_bridge", "IntegerKeyValueSetting"
+    )
     CatalogZone = apps.get_model("netbox_dns_bridge", "CatalogZone")
     CatalogZoneMemberIdentifier = apps.get_model(
         "netbox_dns_bridge", "CatalogZoneMemberIdentifier"
@@ -19,8 +21,9 @@ def copy_serials_and_link_identifiers(apps, schema_editor):
     # Create a CatalogZone for every view that currently has at least one
     # member identifier, seeding each with the old global serial.
     view_ids = set(
-        CatalogZoneMemberIdentifier.objects.exclude(zone__view__isnull=True)
-        .values_list("zone__view_id", flat=True)
+        CatalogZoneMemberIdentifier.objects.exclude(
+            zone__view__isnull=True
+        ).values_list("zone__view_id", flat=True)
     )
 
     view_id_to_catalog_zone = {}
@@ -46,7 +49,9 @@ def copy_serials_and_link_identifiers(apps, schema_editor):
 
 def reverse_migration(apps, schema_editor):
     """Best-effort reverse: restore the KV row and null the FK."""
-    IntegerKeyValueSetting = apps.get_model("netbox_dns_bridge", "IntegerKeyValueSetting")
+    IntegerKeyValueSetting = apps.get_model(
+        "netbox_dns_bridge", "IntegerKeyValueSetting"
+    )
     CatalogZone = apps.get_model("netbox_dns_bridge", "CatalogZone")
     CatalogZoneMemberIdentifier = apps.get_model(
         "netbox_dns_bridge", "CatalogZoneMemberIdentifier"
@@ -65,8 +70,11 @@ def reverse_migration(apps, schema_editor):
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("netbox_dns", "0030_dnsseckeytemplate_comments_dnsseckeytemplate_owner_and_more"),
-        ("netbox_dns_bridge", "0003_integerkeyvaluesetting_key_unique"),
+        (
+            "netbox_dns",
+            "0030_dnsseckeytemplate_comments_dnsseckeytemplate_owner_and_more",
+        ),
+        ("netbox_dns_bridge", "0002_alter_integerkeyvaluesetting_options_and_more"),
     ]
 
     operations = [

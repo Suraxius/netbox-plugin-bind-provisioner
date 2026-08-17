@@ -5,6 +5,7 @@ import dns.rdataclass
 from netbox_dns_bridge.utils import get_logger
 from netbox_dns.models import Zone as NBZone, View as NBView
 from netbox_dns_bridge.models import CatalogZone, CatalogZoneMemberIdentifier
+from netbox_dns_bridge.jobs import notify
 from uuid import uuid4
 from base64 import b32encode
 from django.db import transaction, close_old_connections, OperationalError
@@ -38,12 +39,16 @@ def increment_soa_serial(view: NBView) -> int:
                 f"is now {soa_serial_obj.soa_serial}"
             )
 
-            return soa_serial_obj.soa_serial
+            serial = soa_serial_obj.soa_serial
         except OperationalError as e:
             LOGGER.error(
                 f"ERROR: Failed to increment the Catalog Zone's SOA serial: {e}"
             )
             close_old_connections()
+            return None
+
+    notify.schedule_catalog_zone_notify(view)
+    return serial
 
 
 def create_zone(name, view_name) -> dns.zone.Zone:

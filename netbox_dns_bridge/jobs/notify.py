@@ -17,6 +17,7 @@ from netbox_dns_bridge.models import SeenTransferClients, CatalogZone
 LOGGER = get_logger(__name__)
 SETTINGS = settings.PLUGINS_CONFIG.get("netbox_dns_bridge", {})
 
+
 def _load_tsig_key(view_name: str) -> dns.tsig.Key:
     tsig_keys = SETTINGS.get("tsig_keys", {})
     if view_name not in tsig_keys:
@@ -41,7 +42,50 @@ def _load_tsig_key(view_name: str) -> dns.tsig.Key:
     return dns.tsig.Key(name=key_name, secret=secret, algorithm=algorithm)
 
 
-class SendClientDNSNotify(JobRunner):
+def _send_notify(
+    zone_name,
+    soa_serial,
+    targets,
+    tsig_key,
+    view_name,
+    notify_over_tcp,
+    port,
+    log_prefix="NOTIFY",
+):
+    """Build a DNS NOTIFY message for *zone_name* and send it to every target IP."""
+    fqdn = dns.name.from_text(zone_name, dns.name.root).to_text()
+    msg = dns.message.make_query(fqdn, dns.rdatatype.SOA)
+    msg.flags |= dns.flags.AA
+    msg.set_opcode(dns.opcode.NOTIFY)
+
+    soa_rdata = dns.rdata.from_text(
+        dns.rdataclass.IN,
+        dns.rdatatype.SOA,
+        f"invalid. invalid. {soa_serial} 60 10 1209600 0",
+    )
+    msg.answer.append(dns.rrset.from_rdata(fqdn, 0, soa_rdata))
+    msg.use_tsig(keyring={tsig_key.name: tsig_key}, keyname=tsig_key.name)
+
+    for target in targets:
+        try:
+            if notify_over_tcp:
+                LOGGER.debug(f"Sending {log_prefix} over TCP")
+                dns.query.tcp(msg, target, port=port, timeout=2)
+            else:
+                LOGGER.debug(f"Sending {log_prefix} over UDP")
+                dns.query.udp(msg, target, port=port, timeout=2)
+
+            LOGGER.info(
+                f"{log_prefix} sent: {target} {view_name}/{fqdn} {soa_serial}"
+            )
+        except Exception as e:
+            LOGGER.error(
+                f"{log_prefix} failed: {target}:{port}"
+                f" {view_name}/{fqdn} {soa_serial}: {e}"
+            )
+
+
+class SendClientNotify(JobRunner):
     class Meta:
         name = "Send DNS NOTIFY"
 
@@ -49,61 +93,25 @@ class SendClientDNSNotify(JobRunner):
         notify_over_tcp = SETTINGS.get("notify_over_tcp", False)
         port = SETTINGS.get("notify_client_port", 53)
         view_name = kwargs["view_name"]
+        zone_name = kwargs["zone_name"]
+        soa_serial = kwargs["soa_serial"]
 
         try:
             view = View.objects.get(name=view_name)
-            try:
-                catz_serial = view.catalog_zone.soa_serial
-            except CatalogZone.DoesNotExist as e:
-                LOGGER.error(f"Failed to get catalog zone serial: {e}")
-                return
-
-            zones = [
-                (kwargs["zone_name"], kwargs["soa_serial"]),
-                ("catz", catz_serial),
-                (f"{view_name}.catz", catz_serial),
-            ]
-
             tsig_key = _load_tsig_key(view_name)
             cutoff_hours = SETTINGS.get("notify_client_alive_threshold_hours", 24)
             seen_cutoff = timezone.now() - timezone.timedelta(hours=cutoff_hours)
 
-            clients = SeenTransferClients.objects.filter(
-                view=view, last_seen__gte=seen_cutoff
+            clients = list(
+                SeenTransferClients.objects.filter(
+                    view=view, last_seen__gte=seen_cutoff
+                ).values_list("source_ip", flat=True)
             )
 
-            for zone_name, soa_serial in zones:
-                zone_name = dns.name.from_text(zone_name, dns.name.root).to_text()
-                msg = dns.message.make_query(zone_name, dns.rdatatype.SOA)
-                msg.flags |= dns.flags.AA  # = 0
-                msg.set_opcode(dns.opcode.NOTIFY)
-
-                soa_rdata = dns.rdata.from_text(
-                    dns.rdataclass.IN,
-                    dns.rdatatype.SOA,
-                    f"invalid. invalid. {soa_serial} 60 10 1209600 0",
-                )
-                soa_rrset = dns.rrset.from_rdata(zone_name, 0, soa_rdata)
-                msg.answer.append(soa_rrset)
-                msg.use_tsig(keyring={tsig_key.name: tsig_key}, keyname=tsig_key.name)
-
-                for client in clients:
-                    try:
-                        if notify_over_tcp:
-                            LOGGER.debug("Sending NOTIFY over TCP")
-                            dns.query.tcp(msg, client.source_ip, port=port, timeout=2)
-                        else:
-                            LOGGER.debug("Sending NOTIFY over UDP")
-                            dns.query.udp(msg, client.source_ip, port=port, timeout=2)
-
-                        LOGGER.info(
-                            f"NOTIFY sent: {client.source_ip} {view_name}/{zone_name} {soa_serial}"
-                        )
-                    except Exception as e:
-                        LOGGER.error(
-                            f"NOTIFY failed: {client.source_ip}:{port}"
-                            f" {view_name}/{zone_name} {soa_serial}: {e}"
-                        )
+            _send_notify(
+                zone_name, soa_serial, clients, tsig_key,
+                view_name, notify_over_tcp, port, log_prefix="NOTIFY",
+            )
 
         except View.DoesNotExist as e:
             LOGGER.error(f"Failed to get view for NOTIFY: {e}")
@@ -116,10 +124,10 @@ class SendClientDNSNotify(JobRunner):
 class SendNSNotify(JobRunner):
     """Send a NOTIFY straight to a zone's own nameservers.
 
-    Unlike ``SendClientDNSNotify`` (which notifies clients that previously queried the
-    transfer endpoint), this job resolves the addresses of the zone's configured
-    nameservers from NetBox DNS itself and notifies each of them so they pick up
-    the changed zone quickly.
+    Unlike ``SendClientNotify`` (which notifies clients that previously queried
+    the transfer endpoint), this job resolves the addresses of the zone's
+    configured nameservers from NetBox DNS itself and notifies each of them so
+    they pick up the changed zone quickly.
     """
 
     class Meta:
@@ -156,33 +164,10 @@ class SendNSNotify(JobRunner):
             LOGGER.error(f"NS NOTIFY aborted for {view_name}/{zone_name}: {e}")
             return
 
-        fqdn = dns.name.from_text(zone_name, dns.name.root).to_text()
-        msg = dns.message.make_query(fqdn, dns.rdatatype.SOA)
-        msg.flags |= dns.flags.AA
-        msg.set_opcode(dns.opcode.NOTIFY)
-
-        soa_rdata = dns.rdata.from_text(
-            dns.rdataclass.IN,
-            dns.rdatatype.SOA,
-            f"invalid. invalid. {soa_serial} 60 10 1209600 0",
+        _send_notify(
+            zone_name, soa_serial, ns_targets, tsig_key,
+            view_name, notify_over_tcp, port, log_prefix="NS NOTIFY",
         )
-        msg.answer.append(dns.rrset.from_rdata(fqdn, 0, soa_rdata))
-        msg.use_tsig(keyring={tsig_key.name: tsig_key}, keyname=tsig_key.name)
-
-        for ip in ns_targets:
-            try:
-                if notify_over_tcp:
-                    LOGGER.debug("Sending NS NOTIFY over TCP")
-                    dns.query.tcp(msg, ip, port=port, timeout=2)
-                else:
-                    LOGGER.debug("Sending NS NOTIFY over UDP")
-                    dns.query.udp(msg, ip, port=port, timeout=2)
-
-                LOGGER.info(f"NS NOTIFY sent: {ip} {view_name}/{fqdn} {soa_serial}")
-            except Exception as e:
-                LOGGER.error(
-                    f"NS NOTIFY failed: {ip} {view_name}/{fqdn} {soa_serial}: {e}"
-                )
 
 
 def _get_soa_serial(zone: Zone):
@@ -239,12 +224,33 @@ def _resolve_zone_nameserver_ips(zone: Zone) -> list:
     return ips
 
 
+def _notify_ns_enabled(zone) -> bool:
+    """Return True if a NOTIFY to the zone's nameservers should be sent.
+
+    Enabled either globally for every zone via ``notify_ns_all_zones`` or per
+    zone when the boolean custom field named by ``notify_ns_custom_field_name``
+    is set to True on the zone.
+    """
+    if SETTINGS.get("notify_ns_all_zones", False):
+        return True
+
+    cf_name = SETTINGS.get("notify_ns_custom_field_name")
+    if not cf_name:
+        return False
+
+    custom_fields = getattr(zone, "custom_field_data", None) or {}
+    return custom_fields.get(cf_name) is True
+
+
 def schedule_client_notify(zone: Zone):
+    if not SETTINGS.get("notify_clients", False):
+        return
+
     soa_serial = _get_soa_serial(zone)
     if soa_serial is None:
         return
 
-    SendClientDNSNotify.enqueue(
+    SendClientNotify.enqueue(
         zone_name=zone.name,
         view_name=zone.view.name,
         soa_serial=soa_serial,
@@ -252,6 +258,9 @@ def schedule_client_notify(zone: Zone):
 
 
 def schedule_ns_notify(zone: Zone):
+    if not _notify_ns_enabled(zone):
+        return
+
     soa_serial = _get_soa_serial(zone)
     if soa_serial is None:
         return
@@ -261,4 +270,25 @@ def schedule_ns_notify(zone: Zone):
         zone_name=zone.name,
         view_name=zone.view.name,
         soa_serial=soa_serial,
+    )
+
+
+def schedule_catalog_zone_notify(view: View):
+    if not SETTINGS.get("notify_clients", False):
+        return
+
+    try:
+        serial = view.catalog_zone.soa_serial
+    except CatalogZone.DoesNotExist:
+        return
+
+    SendClientNotify.enqueue(
+        zone_name="catz",
+        soa_serial=serial,
+        view_name=view.name,
+    )
+    SendClientNotify.enqueue(
+        zone_name=f"{view.name}.catz",
+        soa_serial=serial,
+        view_name=view.name,
     )

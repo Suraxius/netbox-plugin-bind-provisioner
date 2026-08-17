@@ -1,4 +1,16 @@
 ## Unreleased
+- Move `notify_handler` from `signals/` to `jobs/` and rename to `notify`.
+- Rename `SendClientDNSNotify` to `SendClientNotify`. It now sends a single NOTIFY
+  for the zone only; catalog zone entries (`catz`, `{view}.catz`) have been removed.
+- Catalog zone NOTIFY is now scheduled by `increment_soa_serial` via
+  `schedule_catalog_zone_notify`, which enqueues `SendClientNotify` for `catz` and
+  `{view}.catz` — no separate job class needed.
+- Extract a shared `_send_notify` helper used by both `SendClientNotify` and
+  `SendNSNotify` for message building and the send loop.
+- Move all NOTIFY scheduling gates (`notify_clients`, `notify_ns_all_zones`, custom
+  field) into the scheduling functions. The signal handler calls the scheduling
+  functions unconditionally; each function decides whether to enqueue based on its
+  own settings gate.
 - Replace the global `IntegerKeyValueSetting` model (single `catalog-zone-soa-serial`
   value shared by all catalog zones) with a new `CatalogZone` model that has a 1:1
   foreign key to `netbox_dns.models.View` and its own `soa_serial` field. Each view's

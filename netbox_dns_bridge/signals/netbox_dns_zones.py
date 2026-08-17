@@ -1,13 +1,11 @@
 from django.db.models.signals import pre_save, post_save, post_delete
 from django.dispatch import receiver
 from django.db import transaction
-from django.conf import settings
 from netbox.context import current_request
 from netbox_dns.models import Zone, View
 from netbox_dns_bridge.management.commands.dns_transfer_endpoint import catalog_zone_manager as catzm
-from . import notify_handler
+from netbox_dns_bridge.jobs import notify
 
-SETTINGS = settings.PLUGINS_CONFIG.get("netbox_dns_bridge", {})
 
 @receiver(pre_save, sender=Zone)
 def zone_pre_save(sender, instance, **kwargs):
@@ -61,7 +59,8 @@ def zone_post_save(sender, instance, created, **kwargs):
         and old_view_id != zone.view_id
     )
 
-    # On commit, increment soa serial and if notify is enabled, schedule bg job.
+    # On commit, increment soa serial and schedule notify jobs. All settings
+    # gating happens inside the scheduling functions.
     def _on_commit():
         if view_changed:
             try:
@@ -71,13 +70,9 @@ def zone_post_save(sender, instance, created, **kwargs):
                 pass
         catzm.increment_soa_serial(zone.view)
 
-        if SETTINGS.get("notify_clients", False):
-            notify_handler.schedule_client_notify(zone)
-
-        # Send a NOTIFY to the zone's own nameservers when its SOA serial changed
-        # and the feature is enabled — globally or per zone via a custom field.
-        if soa_serial_changed and _notify_ns_enabled(zone):
-            notify_handler.schedule_ns_notify(zone)
+        if soa_serial_changed:
+            notify.schedule_client_notify(zone)
+            notify.schedule_ns_notify(zone)
 
     transaction.on_commit(_on_commit)
 
@@ -99,21 +94,3 @@ def zone_post_delete(sender, instance, **kwargs):
         catzm.increment_soa_serial(instance.view)
 
     transaction.on_commit(_on_commit)
-
-
-def _notify_ns_enabled(zone) -> bool:
-    """Return True if a NOTIFY to the zone's nameservers should be sent.
-
-    Enabled either globally for every zone via ``notify_ns_all_zones`` or per
-    zone when the boolean custom field named by ``notify_ns_custom_field_name``
-    is set to True on the zone.
-    """
-    if SETTINGS.get("notify_ns_all_zones", False):
-        return True
-
-    cf_name = SETTINGS.get("notify_ns_custom_field_name")
-    if not cf_name:
-        return False
-
-    custom_fields = getattr(zone, "custom_field_data", None) or {}
-    return custom_fields.get(cf_name) is True

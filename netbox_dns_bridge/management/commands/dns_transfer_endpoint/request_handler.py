@@ -15,7 +15,7 @@ from django.db import close_old_connections, OperationalError
 from django.conf import settings
 from netbox_dns.models import Zone, View
 from . import catalog_zone_manager as catzm
-from netbox_dns_bridge.models import SeenTransferClients
+from netbox_dns_bridge.models import SeenTransferClient
 from netbox_dns_bridge.utils import build_dns_zone, get_logger
 
 LOGGER = get_logger(__name__)
@@ -77,7 +77,7 @@ class DNSBaseRequestHandler(socketserver.BaseRequestHandler):
     def _track_seen_client(self, source_ip: str, view: View) -> None:
         if SETTINGS.get("notify_clients", False):
             try:
-                SeenTransferClients.objects.update_or_create(
+                SeenTransferClient.objects.update_or_create(
                     source_ip=source_ip,
                     view=view,
                     defaults={"last_seen": timezone.now()},

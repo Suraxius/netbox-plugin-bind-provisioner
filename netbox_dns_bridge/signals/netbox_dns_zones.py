@@ -77,15 +77,15 @@ def zone_post_save(sender, instance, created, **kwargs):
     transaction.on_commit(_on_commit)
 
     if created:
-        # If zone was created, create catz member identifier record for this zone.
-        catzm.update_member_identifier(zone)
+        # If zone was created, create the catalog zone member record for this zone.
+        catzm.update_member(zone)
     else:
-        # Re-create the catz member identifier when the zone name or its view
-        # changed. A view move leaves the identifier pointing at the wrong
+        # Re-create the catalog zone member when the zone name or its view
+        # changed. A view move leaves the member pointing at the wrong
         # catalog zone, so it must be refreshed.
         old_name = getattr(zone, "_old_name", None)
         if (old_name and zone.name != old_name) or view_changed:
-            catzm.update_member_identifier(zone)
+            catzm.update_member(zone)
 
 
 @receiver(post_delete, sender=Zone)

@@ -1,0 +1,38 @@
+{% extends 'generic/object.html' %}
+{% load plugins %}
+{% load i18n %}
+
+{% block content %}
+<div class="row">
+  <div class="col col-md-6">
+    <div class="card">
+      <h5 class="card-header">{% trans "Seen Transfer Client" %}</h5>
+      <table class="table table-hover attr-table">
+        <tr>
+          <th scope="row">{% trans "Source IP" %}</th>
+          <td>{{ object.source_ip }}</td>
+        </tr>
+        <tr>
+          <th scope="row">{% trans "View" %}</th>
+          <td>{{ object.view|linkify }}</td>
+        </tr>
+        <tr>
+          <th scope="row">{% trans "Last Seen" %}</th>
+          <td>{{ object.last_seen|date:"Y-m-d H:i:s" }}</td>
+        </tr>
+      </table>
+    </div>
+    {% include 'inc/panels/custom_fields.html' %}
+    {% plugin_left_page object %}
+  </div>
+  <div class="col col-md-6">
+    {% include 'inc/panels/tags.html' %}
+    {% plugin_right_page object %}
+  </div>
+</div>
+<div class="row">
+  <div class="col col-md-12">
+    {% plugin_full_width_page object %}
+  </div>
+</div>
+{% endblock %}

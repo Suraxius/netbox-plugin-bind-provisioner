@@ -12,7 +12,7 @@ from django.db import close_old_connections, OperationalError
 from netbox.jobs import JobRunner
 from netbox_dns.models import View, Zone, Record
 from netbox_dns_bridge.utils import get_logger
-from netbox_dns_bridge.models import SeenTransferClients, CatalogZone
+from netbox_dns_bridge.models import SeenTransferClient, CatalogZone
 
 LOGGER = get_logger(__name__)
 SETTINGS = settings.PLUGINS_CONFIG.get("netbox_dns_bridge", {})
@@ -111,7 +111,7 @@ class SendClientNotify(JobRunner):
             seen_cutoff = timezone.now() - timezone.timedelta(hours=cutoff_hours)
 
             clients = list(
-                SeenTransferClients.objects.filter(
+                SeenTransferClient.objects.filter(
                     view=view, last_seen__gte=seen_cutoff
                 ).values_list("source_ip", flat=True)
             )

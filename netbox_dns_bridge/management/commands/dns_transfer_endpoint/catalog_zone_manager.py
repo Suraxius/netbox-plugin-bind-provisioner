@@ -4,7 +4,7 @@ import dns.rdatatype
 import dns.rdataclass
 from netbox_dns_bridge.utils import get_logger
 from netbox_dns.models import Zone as NBZone, View as NBView
-from netbox_dns_bridge.models import CatalogZone, CatalogZoneMemberIdentifier
+from netbox_dns_bridge.models import CatalogZone, CatalogZoneMember
 from netbox_dns_bridge.jobs import notify
 from uuid import uuid4
 from base64 import b32encode
@@ -63,7 +63,7 @@ def create_zone(name, view_name) -> dns.zone.Zone:
         # get zones from netbox
         nb_zones = NBZone.objects.filter(
             view__name=view_name, active=True
-        ).select_related("catz_identifier")
+        ).select_related("catalog_zone_member")
 
         ptr_base = dns.name.from_text("zones", origin)
 
@@ -73,21 +73,21 @@ def create_zone(name, view_name) -> dns.zone.Zone:
 
             # Create PTR record
             try:
-                catz_identifier = nb_zone.catz_identifier
-            except NBZone.catz_identifier.RelatedObjectDoesNotExist:
+                member = nb_zone.catalog_zone_member
+            except NBZone.catalog_zone_member.RelatedObjectDoesNotExist:
                 catalog_zone = _get_or_create_catalog_zone(nb_zone.view)
-                catz_identifier = CatalogZoneMemberIdentifier.objects.create(
+                member = CatalogZoneMember.objects.create(
                     zone=nb_zone,
-                    name=_generate_member_identifier(),
+                    name=_generate_member_name(),
                     catalog_zone=catalog_zone,
                 )
 
-            p_name = catz_identifier.name
+            p_name = member.name
 
             ptr_name = dns.name.from_text(p_name, ptr_base)
             if not ptr_name.is_subdomain(origin):
                 raise ValueError(
-                    f"Catalog zone member identifier {ptr_name.to_text()} not a subdomain"
+                    f"Catalog zone member {ptr_name.to_text()} not a subdomain"
                 )
             rdata = dns.rdata.from_text(
                 dns.rdataclass.IN, dns.rdatatype.PTR, qname.to_text()
@@ -132,7 +132,7 @@ def create_zone(name, view_name) -> dns.zone.Zone:
         return None
 
 
-def _generate_member_identifier() -> str:
+def _generate_member_name() -> str:
     return b32encode(uuid4().bytes)[0:26].lower().decode("UTF-8")
 
 
@@ -143,18 +143,18 @@ def _get_or_create_catalog_zone(view: NBView) -> CatalogZone:
     return catalog_zone
 
 
-def update_member_identifier(zone: NBZone) -> None:
+def update_member(zone: NBZone) -> None:
     try:
         catalog_zone = _get_or_create_catalog_zone(zone.view)
-        CatalogZoneMemberIdentifier.objects.update_or_create(
+        CatalogZoneMember.objects.update_or_create(
             zone=zone,
             defaults={
-                "name": _generate_member_identifier(),
+                "name": _generate_member_name(),
                 "catalog_zone": catalog_zone,
             },
         )
     except OperationalError as e:
-        LOGGER.error(f"ERROR: Failed to update Catalog Zone member identifier: {e}")
+        LOGGER.error(f"ERROR: Failed to update Catalog Zone member: {e}")
         close_old_connections()
 
 

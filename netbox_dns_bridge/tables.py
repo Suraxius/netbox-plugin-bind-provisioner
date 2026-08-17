@@ -1,29 +1,30 @@
 import django_tables2 as tables
 from django.utils.translation import gettext_lazy as _
 
-import netbox_dns.models
 from netbox.tables import NetBoxTable
+from netbox.tables.columns import ActionsColumn
 
-from .models import CatalogZone
+from .models import CatalogZone, CatalogZoneMember, SeenTransferClient
 
 
 class CatalogZoneMemberTable(NetBoxTable):
     name = tables.Column(linkify=True)
+    zone = tables.Column(
+        accessor="zone__name",
+        verbose_name=_("Zone"),
+        linkify=True,
+    )
     view = tables.Column(
-        accessor="view__name",
+        accessor="catalog_zone__view__name",
         verbose_name=_("View"),
     )
-    status = tables.Column(verbose_name=_("Status"))
-    catz_identifier = tables.Column(
-        accessor="catz_identifier__name",
-        verbose_name=_("Catalog Zone Identifier"),
-        default="—",
-    )
+
+    actions = ActionsColumn(actions=())
 
     class Meta(NetBoxTable.Meta):
-        model = netbox_dns.models.Zone
-        fields = ("name", "view", "status", "catz_identifier")
-        default_columns = ("name", "view", "status", "catz_identifier")
+        model = CatalogZoneMember
+        fields = ("name", "zone", "view")
+        default_columns = ("name", "zone", "view")
 
 
 class CatalogZoneTable(NetBoxTable):
@@ -37,6 +38,8 @@ class CatalogZoneTable(NetBoxTable):
     soa_retry = tables.Column(verbose_name=_("Retry"))
     soa_expire = tables.Column(verbose_name=_("Expire"))
     soa_minimum = tables.Column(verbose_name=_("Minimum"))
+
+    actions = ActionsColumn(actions=("edit", "changelog"))
 
     class Meta(NetBoxTable.Meta):
         model = CatalogZone
@@ -56,3 +59,20 @@ class CatalogZoneTable(NetBoxTable):
             "soa_expire",
             "soa_minimum",
         )
+
+
+class SeenTransferClientTable(NetBoxTable):
+    source_ip = tables.Column(linkify=True)
+    view = tables.Column(
+        accessor="view__name",
+        verbose_name=_("View"),
+        linkify=True,
+    )
+    last_seen = tables.DateTimeColumn(verbose_name=_("Last Seen"))
+
+    actions = ActionsColumn(actions=())
+
+    class Meta(NetBoxTable.Meta):
+        model = SeenTransferClient
+        fields = ("source_ip", "view", "last_seen")
+        default_columns = ("source_ip", "view", "last_seen")

@@ -1,23 +1,47 @@
-from django.urls import path
+from django.urls import include, path
 
-from .views import (
+from utilities.urls import get_model_urls
+
+# Import views so register_model_view decorators run.
+from .views import (  # noqa: F401
     CatalogZoneEditView,
     CatalogZoneListView,
-    CatalogZoneMembersView,
-    NotifyOverviewView,
+    CatalogZoneMemberListView,
+    CatalogZoneMemberView,
+    CatalogZoneView,
+    SeenTransferClientListView,
+    SeenTransferClientView,
 )
 
 urlpatterns = [
-    path("catalog-zones/", CatalogZoneListView.as_view(), name="catalog_zones"),
     path(
-        "catalog-zones/<int:pk>/edit/",
-        CatalogZoneEditView.as_view(),
-        name="catalogzone_edit",
+        "catalog-zones/",
+        include(
+            get_model_urls("netbox_dns_bridge", "catalogzone", detail=False)
+        ),
+    ),
+    path(
+        "catalog-zones/<int:pk>/",
+        include(get_model_urls("netbox_dns_bridge", "catalogzone")),
     ),
     path(
         "catalog-zone-members/",
-        CatalogZoneMembersView.as_view(),
-        name="catalog_zone_members",
+        include(
+            get_model_urls("netbox_dns_bridge", "catalogzonemember", detail=False)
+        ),
     ),
-    path("notify/", NotifyOverviewView.as_view(), name="notify"),
+    path(
+        "catalog-zone-members/<int:pk>/",
+        include(get_model_urls("netbox_dns_bridge", "catalogzonemember")),
+    ),
+    path(
+        "seen-transfer-clients/",
+        include(
+            get_model_urls("netbox_dns_bridge", "seentransferclient", detail=False)
+        ),
+    ),
+    path(
+        "seen-transfer-clients/<int:pk>/",
+        include(get_model_urls("netbox_dns_bridge", "seentransferclient")),
+    ),
 ]

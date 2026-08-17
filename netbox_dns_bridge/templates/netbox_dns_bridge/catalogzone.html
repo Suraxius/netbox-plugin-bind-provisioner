@@ -1,0 +1,50 @@
+{% extends 'generic/object.html' %}
+{% load plugins %}
+{% load i18n %}
+
+{% block content %}
+<div class="row">
+  <div class="col col-md-6">
+    <div class="card">
+      <h5 class="card-header">{% trans "Catalog Zone SOA" %}</h5>
+      <table class="table table-hover attr-table">
+        <tr>
+          <th scope="row">{% trans "View" %}</th>
+          <td>{{ object.view|linkify }}</td>
+        </tr>
+        <tr>
+          <th scope="row">{% trans "SOA Serial" %}</th>
+          <td>{{ object.soa_serial }}</td>
+        </tr>
+        <tr>
+          <th scope="row">{% trans "Refresh" %}</th>
+          <td>{{ object.soa_refresh }}</td>
+        </tr>
+        <tr>
+          <th scope="row">{% trans "Retry" %}</th>
+          <td>{{ object.soa_retry }}</td>
+        </tr>
+        <tr>
+          <th scope="row">{% trans "Expire" %}</th>
+          <td>{{ object.soa_expire }}</td>
+        </tr>
+        <tr>
+          <th scope="row">{% trans "Minimum" %}</th>
+          <td>{{ object.soa_minimum }}</td>
+        </tr>
+      </table>
+    </div>
+    {% include 'inc/panels/custom_fields.html' %}
+    {% plugin_left_page object %}
+  </div>
+  <div class="col col-md-6">
+    {% include 'inc/panels/tags.html' %}
+    {% plugin_right_page object %}
+  </div>
+</div>
+<div class="row">
+  <div class="col col-md-12">
+    {% plugin_full_width_page object %}
+  </div>
+</div>
+{% endblock %}

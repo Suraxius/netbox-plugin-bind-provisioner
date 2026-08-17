@@ -3,10 +3,9 @@ from django.utils.translation import gettext_lazy as _
 
 import netbox_dns.models
 from netbox.forms import NetBoxModelFilterSetForm, NetBoxModelForm
-from netbox_dns.choices import ZoneStatusChoices
 from utilities.forms.fields import DynamicModelMultipleChoiceField
 
-from .models import CatalogZone
+from .models import CatalogZone, CatalogZoneMember, SeenTransferClient
 
 
 class CatalogZoneForm(NetBoxModelForm):
@@ -35,25 +34,31 @@ class CatalogZoneForm(NetBoxModelForm):
         )
 
 
-class CatalogZoneMemberFilterForm(NetBoxModelFilterSetForm):
-    model = netbox_dns.models.Zone
+class CatalogZoneFilterForm(NetBoxModelFilterSetForm):
+    model = CatalogZone
 
     q = forms.CharField(required=False, label=_("Search"))
     view = DynamicModelMultipleChoiceField(
         queryset=netbox_dns.models.View.objects.all(),
         required=False,
     )
-    status = forms.MultipleChoiceField(
-        choices=ZoneStatusChoices,
+
+
+class CatalogZoneMemberFilterForm(NetBoxModelFilterSetForm):
+    model = CatalogZoneMember
+
+    q = forms.CharField(required=False, label=_("Search"))
+    catalog_zone = forms.ModelMultipleChoiceField(
+        queryset=CatalogZone.objects.all(),
         required=False,
     )
 
 
-class CatalogZoneFilterForm(NetBoxModelFilterSetForm):
-    model = CatalogZone
+class SeenTransferClientFilterForm(NetBoxModelFilterSetForm):
+    model = SeenTransferClient
 
     q = forms.CharField(required=False, label=_("Search"))
-    view = DynamicModelMultipleChoiceField(
+    view = forms.ModelMultipleChoiceField(
         queryset=netbox_dns.models.View.objects.all(),
         required=False,
     )

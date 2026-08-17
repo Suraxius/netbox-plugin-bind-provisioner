@@ -1,13 +1,11 @@
 from django.db import models
-from django.urls import reverse
 
 # import netbox.models
 import netbox_dns.models
+from netbox.models import NetBoxModel
 
 
-class CatalogZone(models.Model):
-    _netbox_private = True
-
+class CatalogZone(NetBoxModel):
     view = models.OneToOneField(
         to=netbox_dns.models.View,
         on_delete=models.CASCADE,
@@ -21,17 +19,14 @@ class CatalogZone(models.Model):
 
     class Meta:
         ordering = ("view__name",)
+        verbose_name = "Catalog Zone"
+        verbose_name_plural = "Catalog Zones"
 
     def __str__(self):
         return f"{self.view.name}: {self.soa_serial}"
 
-    def get_absolute_url(self):
-        return reverse("plugins:netbox_dns_bridge:catalogzone_edit", args=[self.pk])
 
-
-class CatalogZoneMemberIdentifier(models.Model):
-    _netbox_private = True
-
+class CatalogZoneMember(NetBoxModel):
     name = models.CharField(
         max_length=26,
     )
@@ -39,17 +34,19 @@ class CatalogZoneMemberIdentifier(models.Model):
     zone = models.OneToOneField(
         to=netbox_dns.models.Zone,
         on_delete=models.CASCADE,
-        related_name="catz_identifier",
+        related_name="catalog_zone_member",
     )
 
     catalog_zone = models.ForeignKey(
         to=CatalogZone,
         on_delete=models.CASCADE,
-        related_name="member_identifiers",
+        related_name="members",
     )
 
     class Meta:
         ordering = ("name",)
+        verbose_name = "Catalog Zone Member"
+        verbose_name_plural = "Catalog Zone Members"
         constraints = [
             models.UniqueConstraint(
                 fields=["name", "catalog_zone"],
@@ -61,9 +58,7 @@ class CatalogZoneMemberIdentifier(models.Model):
         return self.name
 
 
-class SeenTransferClients(models.Model):
-    _netbox_private = True
-
+class SeenTransferClient(NetBoxModel):
     source_ip = models.GenericIPAddressField()
     last_seen = models.DateTimeField()
     view = models.ForeignKey(
@@ -77,6 +72,8 @@ class SeenTransferClients(models.Model):
 
     class Meta:
         ordering = ("source_ip",)
+        verbose_name = "Seen Transfer Client"
+        verbose_name_plural = "Seen Transfer Clients"
         constraints = [
             models.UniqueConstraint(
                 fields=["source_ip", "view"],

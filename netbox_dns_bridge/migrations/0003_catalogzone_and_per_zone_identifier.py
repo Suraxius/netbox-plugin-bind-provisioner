@@ -88,6 +88,10 @@ class Migration(migrations.Migration):
                     ),
                 ),
                 ("soa_serial", models.IntegerField(default=1)),
+                ("soa_refresh", models.IntegerField(default=60)),
+                ("soa_retry", models.IntegerField(default=10)),
+                ("soa_expire", models.IntegerField(default=1209600)),
+                ("soa_minimum", models.IntegerField(default=0)),
                 (
                     "view",
                     models.OneToOneField(

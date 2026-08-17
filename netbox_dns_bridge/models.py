@@ -1,4 +1,5 @@
 from django.db import models
+from django.urls import reverse
 
 # import netbox.models
 import netbox_dns.models
@@ -13,12 +14,19 @@ class CatalogZone(models.Model):
         related_name="catalog_zone",
     )
     soa_serial = models.IntegerField(default=1)
+    soa_refresh = models.IntegerField(default=60)
+    soa_retry = models.IntegerField(default=10)
+    soa_expire = models.IntegerField(default=1209600)
+    soa_minimum = models.IntegerField(default=0)
 
     class Meta:
         ordering = ("view__name",)
 
     def __str__(self):
         return f"{self.view.name}: {self.soa_serial}"
+
+    def get_absolute_url(self):
+        return reverse("plugins:netbox_dns_bridge:catalogzone_edit", args=[self.pk])
 
 
 class CatalogZoneMemberIdentifier(models.Model):

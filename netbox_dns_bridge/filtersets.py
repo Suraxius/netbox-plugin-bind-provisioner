@@ -5,6 +5,8 @@ import netbox_dns.models
 from netbox.filtersets import NetBoxModelFilterSet
 from netbox_dns.choices import ZoneStatusChoices
 
+from .models import CatalogZone
+
 
 class ZoneFilterSet(NetBoxModelFilterSet):
     view = django_filters.ModelMultipleChoiceFilter(
@@ -27,3 +29,19 @@ class ZoneFilterSet(NetBoxModelFilterSet):
             Q(name__icontains=value)
             | Q(catz_identifier__name__icontains=value)
         )
+
+
+class CatalogZoneFilterSet(NetBoxModelFilterSet):
+    view = django_filters.ModelMultipleChoiceFilter(
+        field_name="view",
+        queryset=netbox_dns.models.View.objects.all(),
+    )
+
+    class Meta:
+        model = CatalogZone
+        fields = ("id", "view")
+
+    def search(self, queryset, name, value):
+        if not value.strip():
+            return queryset
+        return queryset.filter(Q(view__name__icontains=value))

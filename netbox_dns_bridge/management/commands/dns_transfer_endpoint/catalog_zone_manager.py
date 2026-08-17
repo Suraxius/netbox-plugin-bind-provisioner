@@ -174,7 +174,9 @@ def _create_soa_rdataset(view: NBView) -> dns.rdataset:
         rdata = dns.rdata.from_text(
             rclass,
             rtype,
-            f"invalid. invalid. {serial} 60 10 1209600 0",
+            f"invalid. invalid. {serial} {serial_obj.soa_refresh} "
+            f"{serial_obj.soa_retry} {serial_obj.soa_expire} "
+            f"{serial_obj.soa_minimum}",
         )
 
         # Create Rdataset and add the RDATA to it

@@ -51,6 +51,10 @@ def _send_notify(
     notify_over_tcp,
     port,
     log_prefix="NOTIFY",
+    soa_refresh=60,
+    soa_retry=10,
+    soa_expire=1209600,
+    soa_minimum=0,
 ):
     """Build a DNS NOTIFY message for *zone_name* and send it to every target IP."""
     fqdn = dns.name.from_text(zone_name, dns.name.root).to_text()
@@ -61,7 +65,7 @@ def _send_notify(
     soa_rdata = dns.rdata.from_text(
         dns.rdataclass.IN,
         dns.rdatatype.SOA,
-        f"invalid. invalid. {soa_serial} 60 10 1209600 0",
+        f"invalid. invalid. {soa_serial} {soa_refresh} {soa_retry} {soa_expire} {soa_minimum}",
     )
     msg.answer.append(dns.rrset.from_rdata(fqdn, 0, soa_rdata))
     msg.use_tsig(keyring={tsig_key.name: tsig_key}, keyname=tsig_key.name)
@@ -95,6 +99,10 @@ class SendClientNotify(JobRunner):
         view_name = kwargs["view_name"]
         zone_name = kwargs["zone_name"]
         soa_serial = kwargs["soa_serial"]
+        soa_refresh = kwargs.get("soa_refresh", 60)
+        soa_retry = kwargs.get("soa_retry", 10)
+        soa_expire = kwargs.get("soa_expire", 1209600)
+        soa_minimum = kwargs.get("soa_minimum", 0)
 
         try:
             view = View.objects.get(name=view_name)
@@ -111,6 +119,8 @@ class SendClientNotify(JobRunner):
             _send_notify(
                 zone_name, soa_serial, clients, tsig_key,
                 view_name, notify_over_tcp, port, log_prefix="NOTIFY",
+                soa_refresh=soa_refresh, soa_retry=soa_retry,
+                soa_expire=soa_expire, soa_minimum=soa_minimum,
             )
 
         except View.DoesNotExist as e:
@@ -278,17 +288,31 @@ def schedule_catalog_zone_notify(view: View):
         return
 
     try:
-        serial = view.catalog_zone.soa_serial
+        catalog_zone = view.catalog_zone
     except CatalogZone.DoesNotExist:
         return
+
+    serial = catalog_zone.soa_serial
+    soa_refresh = catalog_zone.soa_refresh
+    soa_retry = catalog_zone.soa_retry
+    soa_expire = catalog_zone.soa_expire
+    soa_minimum = catalog_zone.soa_minimum
 
     SendClientNotify.enqueue(
         zone_name="catz",
         soa_serial=serial,
         view_name=view.name,
+        soa_refresh=soa_refresh,
+        soa_retry=soa_retry,
+        soa_expire=soa_expire,
+        soa_minimum=soa_minimum,
     )
     SendClientNotify.enqueue(
         zone_name=f"{view.name}.catz",
         soa_serial=serial,
         view_name=view.name,
+        soa_refresh=soa_refresh,
+        soa_retry=soa_retry,
+        soa_expire=soa_expire,
+        soa_minimum=soa_minimum,
     )
